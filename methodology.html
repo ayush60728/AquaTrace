@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Methodology - AquaTrace</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      max-width: 640px;
+      margin: 40px auto;
+      padding: 0 20px;
+      color: #1a2b3c;
+      line-height: 1.6;
+    }
+    h1 { color: #0d3b66; }
+    h2 { color: #0d3b66; margin-top: 28px; font-size: 17px; }
+    code {
+      background: #eaf3ff;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    .privacy-badge {
+      background: #eafff0;
+      border: 1px solid #b8f0cc;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin: 16px 0;
+    }
+    table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 13px; }
+    td, th { border: 1px solid #e0ecf9; padding: 6px 10px; text-align: left; }
+    th { background: #f4f9ff; }
+  </style>
+</head>
+<body>
+  <h1>💧 How this extension calculates your estimate</h1>
+
+  <div class="privacy-badge">
+    <strong>Privacy:</strong> All tokenization and calculation happens locally,
+    in your browser. No conversation text, token counts, or usage stats are
+    ever sent anywhere. Data lives only in this browser's local extension
+    storage until you clear it or uninstall the extension.
+  </div>
+
+  <h2>0. Each site is tracked independently</h2>
+  <p>
+    ChatGPT, Claude, and Gemini each get their own separate counter and their
+    own model dropdown. Tokens from one site are never combined with or
+    multiplied by a model assumption picked for a different site -- each
+    site's numbers are calculated only from that site's own tokens and that
+    site's own selected model.
+  </p>
+
+  <h2>1. Counting tokens</h2>
+  <p>
+    We use <code>gpt-tokenizer</code>, a JavaScript implementation of OpenAI's
+    real tokenizer (the same byte-pair-encoding scheme used by GPT-4o and
+    GPT-5), to count tokens in whatever text is typed into the chat box and
+    whatever text gets added to the page in response.
+  </p>
+  <p>
+    For GPT-4o Mini and GPT-5, this is the model's <strong>actual</strong>
+    tokenizer, so counts are exact. For Claude and Gemini models, neither
+    Anthropic nor Google publish an installable tokenizer library, so we reuse
+    the OpenAI tokenizer as a stand-in. Token boundaries will differ slightly
+    from what those models really use internally, but total counts land in a
+    similar range for ordinary English text.
+  </p>
+
+  <h2>2. Detecting when a response finished</h2>
+  <p>
+    We watch the page for DOM changes after you submit a prompt. Once the
+    page stays quiet for 1.5 seconds, we treat the response as finished and
+    tokenize whatever text was added during that time.
+  </p>
+
+  <h2>3. Turning tokens into energy</h2>
+  <p>Each model profile has an estimated energy cost per token, in watt-hours:</p>
+  <table>
+    <tr><th>Model</th><th>Est. Wh / token</th><th>Basis</th></tr>
+    <tr><td>GPT-4o Mini</td><td>0.0001</td><td>Small, efficiency-optimized model class</td></tr>
+    <tr><td>GPT-4o</td><td>0.0006</td><td>Mid-large model class -- roughly 6x Mini's cost, consistent with GPT-4o costing ~16x more per token in API pricing</td></tr>
+    <tr><td>GPT-5</td><td>0.0025</td><td>Large frontier / extended-reasoning model class</td></tr>
+    <tr><td>Claude Sonnet</td><td>0.0006</td><td>Mid-large model class</td></tr>
+    <tr><td>Claude Opus</td><td>0.0018</td><td>Large model class</td></tr>
+    <tr><td>Gemini Flash</td><td>0.00012</td><td>Small, efficiency-optimized model class</td></tr>
+    <tr><td>Gemini Pro</td><td>0.0008</td><td>Mid-large model class</td></tr>
+  </table>
+  <p>
+    <strong>None of these are official, disclosed figures</strong> — no AI
+    company publishes exact energy-per-token numbers. These are directional
+    estimates based on known parameter-count classes and published inference
+    energy research, ranked sensibly relative to each other.
+  </p>
+
+  <h2>4. Turning energy into water</h2>
+  <p>
+    Data centers report a Water Usage Effectiveness (WUE) figure: liters of
+    water per kWh of energy used. Unlike our earlier version, we no longer
+    use one shared range for every model -- each model uses the WUE range of
+    the company that actually hosts it, since AWS, Microsoft Azure, and
+    Google run meaningfully different infrastructure.
+  </p>
+  <table>
+    <tr><th>Hosting company</th><th>Used by</th><th>WUE range (L/kWh)</th><th>Basis</th></tr>
+    <tr>
+      <td>Amazon / AWS</td>
+      <td>Claude Sonnet, Claude Opus</td>
+      <td>0.15 – 1.8</td>
+      <td>AWS's own efficient-case claim, up to the broader industry average as a conservative high end</td>
+    </tr>
+    <tr>
+      <td>Microsoft Azure</td>
+      <td>GPT-4o Mini, GPT-5</td>
+      <td>0.30 – 1.52</td>
+      <td>Microsoft's reported fleet-wide figure, up to a reported high-water-use region (Arizona)</td>
+    </tr>
+    <tr>
+      <td>Google</td>
+      <td>Gemini Flash, Gemini Pro</td>
+      <td>0.50 – 1.2</td>
+      <td>Third-party estimate -- Google does not publish an official fleet-wide WUE figure</td>
+    </tr>
+  </table>
+  <p>
+    <strong>Important caveat on Anthropic and Claude specifically:</strong>
+    Anthropic's Claude models run on multiple cloud providers, not exclusively
+    AWS. We use AWS's figures here as a reasonable primary estimate, but this
+    is a simplification, not a confirmed hosting detail.
+  </p>
+  <p><code>mL of water = Wh of energy × WUE (L/kWh)</code> — shown as a range using the relevant company's WUE.</p>
+
+  <h2>5. Optional CO2e estimate</h2>
+  <p>
+    We also show a rough CO2-equivalent figure, using the IEA's 2024 global
+    average power-sector carbon intensity of 445 grams CO2 per kWh. This is a
+    global average — your actual grid's carbon intensity could be several
+    times higher or lower depending on your region's energy mix.
+  </p>
+
+  <h2>Bottom line</h2>
+  <p>
+    Every number in this extension is a modeled estimate built from public
+    research, not a measurement of your specific request. Treat it as
+    illustrative — a way to build intuition for how usage scales with
+    conversation length and model size — rather than a precise figure.
+  </p>
+</body>
+</html>
