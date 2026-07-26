@@ -80,7 +80,3 @@ Issues and pull requests are welcome — in particular:
 - Additional model profiles or updated energy estimates as better research becomes available
 - Support for more AI chat sites
 - More robust detection selectors as sites change their UI
-
-## License
-
-MIT — see [LICENSE](./LICENSE) 
