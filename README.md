@@ -23,7 +23,7 @@ AquaTrace is a Chrome extension that counts the tokens in your AI chatbot conver
 3. **Counting tokens** — both the prompt and response text are run through the real tokenizer to get an exact (or closely approximated, for non-OpenAI models) token count.
 4. **Estimating impact** — token counts are converted to energy (Wh) using a per-model estimate, then to water (mL) using the hosting company's reported water efficiency, and optionally to CO2e using a global grid average.
 
-Full details, including every constant and its source, are in [`methodology.html`](./methodology.html) or via the "How is this calculated?" link inside the extension.
+Full details, including every constant and its source, are in [`methodology.html`](./AquaTrace/methodology.html) or via the "How is this calculated?" link inside the extension.
 
 ## Installation (for development/testing)
 
