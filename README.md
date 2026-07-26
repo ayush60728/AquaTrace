@@ -1,81 +1,66 @@
-# 💧 AquaTrace
+# AquaTrace — System Architecture
 
-**See the estimated water, energy, and CO2 footprint of your ChatGPT, Claude, and Gemini conversations — calculated entirely on your device.**
+This document describes how AquaTrace's pieces fit together. For feature docs and setup instructions, see [README.md](./README.md). For the water/energy/CO2 calculation methodology, see [methodology.html](./methodology.html).
 
-AquaTrace is a Chrome extension that counts the tokens in your AI chatbot conversations using a real tokenizer, then estimates the environmental cost of that usage based on published research about model energy consumption and data center water efficiency. Every number is a clearly-labeled estimate, never presented as an exact measurement — and nothing ever leaves your browser.
+## High-level architecture
 
----
+```mermaid
+graph LR
+    %% ── Browser Tab ──────────────────────────────────────
+    subgraph TAB["🌐 Browser Tab (chatgpt.com / claude.ai / gemini.google.com)"]
+        direction TB
+        DOM["Page DOM\n(prompt input + streaming response)"]
+        CS["content.js\n(content script)"]
+        TOK["gpt-tokenizer\n(bundled, o200k_base)"]
+        DOM -->|"Enter / send click"| CS
+        CS -->|"count tokens"| TOK
+    end
 
-## Features
+    %% ── Extension Runtime ────────────────────────────────
+    subgraph EXT["🧩 Extension Runtime"]
+        direction TB
+        BG["background.js\n(service worker)"]
+        CFG["modelProfiles.js\n(shared config)"]
+        STORE["chrome.storage.local\n(per-site state)"]
+        BG --> CFG
+        BG <--> STORE
+    end
 
-- **Real tokenization** — uses [`gpt-tokenizer`](https://github.com/niieani/gpt-tokenizer) (OpenAI's actual `o200k_base` BPE tokenizer) to count prompt and response tokens, instead of a rough character-count guess.
-- **Auto-detects your specific model** — recognizes GPT-4o vs GPT-4o Mini vs GPT-5, Claude Sonnet vs Opus, and Gemini Flash vs Pro directly from the page, with a manual override if you want to correct it.
-- **Per-site, independent tracking** — ChatGPT, Claude, and Gemini each get their own counter and their own model assumption. Nothing from one site is ever mixed into another site's math.
-- **Per-company water math** — water usage is calculated using the actual hosting provider's reported water efficiency (AWS for Claude, Microsoft Azure for GPT models, Google for Gemini), not one generic industry average.
-- **Single-tab view** — the popup shows only the site your current browser tab is on, auto-switching each time you open it. No scrolling through every site you've ever used.
-- **Full transparency** — a built-in methodology page explains every formula, every constant, and every source, and the extension states plainly that these are modeled estimates, not measurements.
-- **100% local** — no network requests, no analytics, no data collection of any kind. All calculation happens in your browser using `chrome.storage.local`.
+    %% ── Popup UI ─────────────────────────────────────────
+    subgraph POPUP["💧 Popup UI (on click)"]
+        direction TB
+        UI["popup.js"]
+        UI --> CFG
+    end
 
-## How it works
-
-1. **Detecting a prompt** — a content script watches for the Enter key or a send-button click on the chat page.
-2. **Detecting the response** — a `MutationObserver` watches the page for new content, and considers the response "done" once the page goes quiet for 1.5 seconds.
-3. **Counting tokens** — both the prompt and response text are run through the real tokenizer to get an exact (or closely approximated, for non-OpenAI models) token count.
-4. **Estimating impact** — token counts are converted to energy (Wh) using a per-model estimate, then to water (mL) using the hosting company's reported water efficiency, and optionally to CO2e using a global grid average.
-
-Full details, including every constant and its source, are in [`methodology.html`](./AquaTrace/methodology.html) or via the "How is this calculated?" link inside the extension.
-
-## Installation (for development/testing)
-
-This isn't yet on the Chrome Web Store. To try it locally:
-
-```bash
-git clone <this-repo>
-cd aquatrace
-npm install
-npm run build
+    %% ── Flows ────────────────────────────────────────────
+    CS -->|"PROMPT_SENT\n(tokens, detected model)"| BG
+    UI -->|"SET_MODEL / RESET_SITE /\nRESET_ALL / USE_AUTO_DETECT"| BG
+    UI -->|"tabs.query (activeTab)"| TAB
+    UI -->|"read state"| STORE
 ```
 
-Then in Chrome:
-1. Go to `chrome://extensions`
-2. Enable **Developer mode** (top right)
-3. Click **Load unpacked**
-4. Select this project's root folder (the one containing `manifest.json`)
+## Components
 
-> **Note:** any time you rebuild after a code change, reload the extension at `chrome://extensions` *and* refresh any already-open ChatGPT/Claude/Gemini tabs — otherwise you'll hit a stale "extension context invalidated" error, since Chrome severs the connection between an already-open tab's content script and a reloaded extension.
+| Component | Role |
+|---|---|
+| **`content.js`** (content script) | Injected into supported AI chat pages only. Detects when a prompt is submitted and when a response finishes streaming, counts tokens for both using the bundled tokenizer, scans the page for the currently-selected model name, and sends the result to the background script. Never sends the actual conversation text anywhere — only token counts. |
+| **`background.js`** (service worker) | The only long-lived piece. Owns all persisted state in `chrome.storage.local`, keyed per site. Applies auto-detected models unless the user has manually overridden that site's choice. Handles reset requests. |
+| **`popup.js`** (popup UI) | Runs only while the popup is open. Determines which site's card to show by querying the active tab, reads state from storage, and renders it. Sends messages to the background script for any state changes (model picks, resets) rather than writing storage directly. |
+| **`modelProfiles.js`** (shared config) | Not a running component — a shared data module imported by `content.js`, `background.js`, and `popup.js` alike, so all three always agree on model energy values, per-company water efficiency ranges, and model-detection keyword patterns. |
+| **`chrome.storage.local`** | The only persistence layer. Never synced, never transmitted — local to the browser profile. |
 
-## Project structure
+## Why this shape
 
-```
-aquatrace/
-├── manifest.json           # Extension manifest (Manifest V3)
-├── popup.html / .css       # The popup UI
-├── methodology.html        # Standalone "how this works" page
-├── privacy-policy.html     # Privacy policy (also hosted externally for the Web Store listing)
-├── src/
-│   ├── modelProfiles.js    # Model energy estimates, per-company WUE, detection patterns
-│   ├── content.js          # Injected into AI chat pages: detects prompts/responses, tokenizes
-│   ├── background.js       # Service worker: stores per-site state, handles resets/model changes
-│   └── popup.js            # Renders the popup UI
-├── icons/                  # Extension icons (16/48/128px)
-└── dist/                   # Built output (generated by `npm run build`, not committed)
-```
+- **Content script never talks to storage directly.** It only ever sends a message to the background script, which is the single source of truth for state. This avoids race conditions if multiple tabs on the same site are open at once.
+- **Popup never runs in the background.** It only exists while open, so it always re-derives "which site am I looking at" fresh from `chrome.tabs.query` rather than trying to stay in sync with a background process.
+- **Shared config, not duplicated constants.** Because `modelProfiles.js` is imported by all three surfaces, an update to a model's energy estimate or detection pattern only needs to happen in one place.
 
+## Data flow for a single prompt (end to end)
 
-## Known limitations
-
-- **Site UI detection is heuristic.** Prompt/response detection relies on matching common patterns (Enter key, "send" button labels, a `<main>` element). If a site substantially redesigns its interface, detection may need updating.
-- **Wh-per-token figures are estimates.** No AI company publishes official energy-per-token numbers. These are directional estimates based on known model size classes, documented with their reasoning in `modelProfiles.js` and `methodology.html`.
-- **Claude and Gemini token counts are approximated.** Neither Anthropic nor Google publish an installable tokenizer, so OpenAI's tokenizer is used as a stand-in. Counts land in a similar range for ordinary English text but token *boundaries* will differ from what those models use internally.
-- **Bundle size.** `content.bundle.js` is ~2.6MB due to the embedded tokenizer data.
-
-## Privacy
-
-AquaTrace makes **zero network requests**. All tokenization, calculation, and storage happens locally in your browser via `chrome.storage.local`. No conversation text, token counts, or usage statistics are ever transmitted anywhere. See [`privacy-policy.html`](./index.html) for the full policy.
-
-## Contributing
-
-Issues and pull requests are welcome — in particular:
-- Additional model profiles or updated energy estimates as better research becomes available
-- Support for more AI chat sites
-- More robust detection selectors as sites change their UI
+1. User types in the chat page and hits Enter.
+2. `content.js` captures the prompt text, tokenizes it, and starts watching the page for the response.
+3. Once the page goes quiet for 1.5s, `content.js` tokenizes the response text and scans the page for the active model's name.
+4. `content.js` sends `PROMPT_SENT` (site, promptTokens, responseTokens, detectedModelId) to `background.js`.
+5. `background.js` updates that site's entry in `chrome.storage.local` — incrementing counts, and updating the model only if the user hasn't manually overridden it.
+6. Next time the popup is opened, `popup.js` reads that entry, applies the current model's Wh/token and the hosting company's WUE range, and renders the result.
