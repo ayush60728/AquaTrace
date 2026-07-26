@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AquaTrace</title>
+  <link rel="stylesheet" href="popup.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo-circle">
+          <img src="icons/icon48.png" alt="AquaTrace logo" width="22" height="22" style="border-radius: 50%; object-fit: cover;" />
+        </div>
+        <div class="header-title-container">
+          <span class="header-water-emoji">💧</span>
+          <h1 class="header-title">AquaTrace</h1>
+        </div>
+      </div>
+      <button id="themeToggleBtn" class="theme-toggle-btn" title="Toggle Theme">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"></circle>
+          <line x1="12" y1="1" x2="12" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="23"></line>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          <line x1="1" y1="12" x2="3" y2="12"></line>
+          <line x1="21" y1="12" x2="23" y2="12"></line>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+      </button>
+    </header>
+
+    <p class="subtitle">Estimate the environmental footprint of your AI conversations.</p>
+
+    <!-- Site Switcher Dropdown (Shown when multiple sites exist) -->
+    <div id="siteSwitcherContainer" class="site-switcher-container" style="display: none;">
+      <label class="select-label" for="siteSwitcher">Viewing Site</label>
+      <div class="select-wrapper">
+        <select id="siteSwitcher" class="site-select"></select>
+      </div>
+    </div>
+
+    <!-- Active Site & Impact Stats -->
+    <div id="currentSiteCard"></div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer-privacy">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+        <span>All calculations are performed locally. No conversations leave your device.</span>
+      </div>
+      <div class="footer-links">
+        <a href="#" id="footerMethodologyLink" class="footer-link">Methodology</a>
+      </div>
+      <div class="footer-copyright">
+        AquaTrace &mdash; estimates only, not measurements
+      </div>
+    </footer>
+  </div>
+
+  <script src="dist/popup.bundle.js"></script>
+</body>
+</html>
