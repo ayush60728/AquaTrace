@@ -83,4 +83,4 @@ Issues and pull requests are welcome — in particular:
 
 ## License
 
-MIT — see [LICENSE](./LICENSE) (or replace with your license of choice before publishing the repo).
+MIT — see [LICENSE](./LICENSE) 
