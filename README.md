@@ -1,6 +1,6 @@
-# AquaTrace — System Architecture
+# AquaTrace  System Architecture
 
-This document describes how AquaTrace's pieces fit together. For feature docs and setup instructions, see [README.md](./README.md). For the water/energy/CO2 calculation methodology, see [methodology.html](./methodology.html).
+This document describes how AquaTrace's pieces fit together. For feature docs and setup instructions, For the water/energy/CO2 calculation methodology, see [methodology.html](./AquaTrace/methodology.html).
 
 ## High-level architecture
 
