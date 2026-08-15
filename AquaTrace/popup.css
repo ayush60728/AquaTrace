@@ -20,9 +20,24 @@
   --banner-bg: #f1f5f9;
   --accent-card-bg: #eff6ff;
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  --bg-main: #ffffff;
+  --bg-card: #f8fafc;
+  /* Light gray/blue for cards */
+  --bg-input: #e2e8f0;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --border-color: #cbd5e1;
 }
 
 body.dark-theme {
+  --bg-main: #0f172a;
+  /* Dark background */
+  --bg-card: #1e293b;
+  /* The dark color currently stuck on your cards */
+  --bg-input: #334155;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
   --bg-main: #0f172a;
   --card-bg: #1e293b;
   --text-primary: #f8fafc;
@@ -35,10 +50,28 @@ body.dark-theme {
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
+/* Add or update your body tag */
 body {
-  width: 360px;
+  width: 350px;
+  /* Enforce a strict standard width */
+  min-width: 350px;
+  max-width: 350px;
+  margin: 0;
+  padding: 10px;
+  overflow-x: hidden;
+  /* Crucial: Hides anything trying to bleed off the edge */
+  box-sizing: border-box;
   background-color: var(--bg-main);
-  color: var(--text-primary);
+  color: var(--text-main);
+  transition: background-color 0.3s, color 0.3s;
+  /* Smooth fade effect */
+}
+
+/* Add this utility class or apply it to your text containers */
+* {
+  /* Forces long words or URLs to break onto the next line */
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 }
 
 .popup-container {
@@ -77,6 +110,21 @@ body {
   display: flex;
   align-items: center;
   gap: 5px;
+}
+
+p,
+.subtext,
+.section-heading {
+  color: var(--text-muted);
+}
+
+/* Apply to your cards and boxes */
+.card,
+.stat-box,
+.impact-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
 }
 
 .header-water-emoji {
@@ -608,4 +656,27 @@ body.dark-theme .footer {
 .footer-copyright {
   font-size: 10.5px;
   color: var(--text-muted);
+}
+
+
+.export-container {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.btn-export {
+  width: 100%;
+  padding: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-card);
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-export:hover {
+  opacity: 0.85;
 }

@@ -42,13 +42,25 @@
     storage until you clear it or uninstall the extension.
   </div>
 
+  <h2>✨ What's New in Version 1.1.0</h2>
+  <ul>
+    <li><strong>DeepSeek Support:</strong> Now tracks DeepSeek V3 and DeepSeek R1 models with accurate energy estimates</li>
+    <li><strong>Export Functionality:</strong> Download your complete environmental footprint data as a CSV file for record-keeping or analysis</li>
+    <li><strong>Enhanced Accuracy:</strong> Updated energy and water usage estimates based on latest research</li>
+  </ul>
+
   <h2>0. Each site is tracked independently</h2>
   <p>
-    ChatGPT, Claude, and Gemini each get their own separate counter and their
-    own model dropdown. Tokens from one site are never combined with or
-    multiplied by a model assumption picked for a different site -- each
-    site's numbers are calculated only from that site's own tokens and that
-    site's own selected model.
+    ChatGPT, Claude, Gemini, and <strong>DeepSeek</strong> each get their own separate counter
+    and their own model dropdown. Tokens from one site are never combined
+    with or multiplied by a model assumption picked for a different site --
+    each site's numbers are calculated only from that site's own tokens and
+    that site's own selected model.
+  </p>
+  <p>
+    <strong>Note:</strong> As of version 1.1.0, we've added full support for DeepSeek AI, 
+    including both DeepSeek V3 and the reasoning-focused DeepSeek R1 model. These models 
+    are automatically detected when you use chat.deepseek.com.
   </p>
 
   <h2>1. Counting tokens</h2>
@@ -85,12 +97,22 @@
     <tr><td>Claude Opus</td><td>0.0018</td><td>Large model class</td></tr>
     <tr><td>Gemini Flash</td><td>0.00012</td><td>Small, efficiency-optimized model class</td></tr>
     <tr><td>Gemini Pro</td><td>0.0008</td><td>Mid-large model class</td></tr>
+    <tr><td>DeepSeek V3</td><td>0.001</td><td>Large MoE model class (671B total / 37B active params) -- no clean published figure exists specifically for V3, so this is estimated relative to similarly-sized models</td></tr>
+    <tr><td>DeepSeek R1</td><td>0.0029</td><td>Derived from a benchmark measuring 33.634 Wh for a long exchange of ~11,500 total tokens. R1's well-publicized high per-query energy use mostly reflects generating far more output tokens via chain-of-thought reasoning, not a dramatically worse per-token rate</td></tr>
   </table>
   <p>
     <strong>None of these are official, disclosed figures</strong> — no AI
     company publishes exact energy-per-token numbers. These are directional
     estimates based on known parameter-count classes and published inference
     energy research, ranked sensibly relative to each other.
+  </p>
+  <p>
+    <strong>Special note on DeepSeek models:</strong> DeepSeek V3 is a Mixture-of-Experts (MoE) 
+    architecture with 671B total parameters but only 37B active per token, making it relatively 
+    efficient. DeepSeek R1 is designed for chain-of-thought reasoning and typically generates 
+    significantly more output tokens (including internal reasoning steps), which results in higher 
+    per-query energy consumption — though the per-token rate itself is comparable to other 
+    large reasoning models.
   </p>
 
   <h2>4. Turning energy into water</h2>
@@ -121,6 +143,12 @@
       <td>0.50 – 1.2</td>
       <td>Third-party estimate -- Google does not publish an official fleet-wide WUE figure</td>
     </tr>
+    <tr>
+      <td>China (national grid/infrastructure)</td>
+      <td>DeepSeek V3, DeepSeek R1</td>
+      <td>1.0 – 3.0</td>
+      <td>Rough placeholder using general industry-wide WUE figures -- no major Chinese cloud operator publishes a fleet-wide WUE figure at all, so this is the least certain of the four company estimates</td>
+    </tr>
   </table>
   <p>
     <strong>Important caveat on Anthropic and Claude specifically:</strong>
@@ -130,12 +158,35 @@
   </p>
   <p><code>mL of water = Wh of energy × WUE (L/kWh)</code> — shown as a range using the relevant company's WUE.</p>
 
-  <h2>5. Optional CO2e estimate</h2>
+  <h2>5. Turning energy into CO2e</h2>
   <p>
-    We also show a rough CO2-equivalent figure, using the IEA's 2024 global
-    average power-sector carbon intensity of 445 grams CO2 per kWh. This is a
-    global average — your actual grid's carbon intensity could be several
-    times higher or lower depending on your region's energy mix.
+    Grid carbon intensity varies significantly by region, so this uses a
+    per-company/region figure rather than one flat global number:
+  </p>
+  <ul>
+    <li><strong>AWS, Microsoft Azure, Google:</strong> 445 g CO2 per kWh (IEA global average, 2024)</li>
+    <li><strong>China (DeepSeek):</strong> 555 g CO2 per kWh -- a rough midpoint of IEA figures showing China's grid at
+      approximately 565 g/kWh in 2024, forecast to decline toward 505 g/kWh by 2026. China's grid is meaningfully
+      more carbon-intensive than the global average, which is a real factor in why DeepSeek's CO2e estimate runs
+      higher, separate from its energy-per-token efficiency</li>
+  </ul>
+
+  <h2>6. Exporting your data</h2>
+  <p>
+    The extension includes an <strong>export feature</strong> that allows you to download all your tracked usage data 
+    as a CSV (comma-separated values) file. This includes:
+  </p>
+  <ul>
+    <li>Per-site breakdown of prompts sent and tokens used</li>
+    <li>Model selection for each AI service</li>
+    <li>Calculated water consumption (in mL, with low/high range)</li>
+    <li>Energy usage (in watt-hours)</li>
+    <li>CO₂ emissions (in grams)</li>
+  </ul>
+  <p>
+    The exported data is perfect for personal record-keeping, academic research, or simply understanding your 
+    AI usage patterns over time. The export button is available in the popup interface, and the generated CSV 
+    can be opened in any spreadsheet application (Excel, Google Sheets, LibreOffice, etc.).
   </p>
 
   <h2>Bottom line</h2>
@@ -145,5 +196,23 @@
     illustrative — a way to build intuition for how usage scales with
     conversation length and model size — rather than a precise figure.
   </p>
+
+  <h2>Version History & Features</h2>
+  <p><strong>Version 1.1.0</strong> (Current)</p>
+  <ul>
+    <li>Added support for DeepSeek V3 and DeepSeek R1 models</li>
+    <li>Implemented CSV export functionality for all usage data</li>
+    <li>Updated energy estimates with latest research data</li>
+    <li>Enhanced company-specific WUE and carbon intensity calculations for Chinese infrastructure</li>
+    <li>Improved UI with better dark theme support</li>
+  </ul>
+  <p><strong>Version 1.0.0</strong></p>
+  <ul>
+    <li>Initial release with support for ChatGPT, Claude, and Gemini</li>
+    <li>Company-specific WUE ranges (Amazon, Microsoft, Google)</li>
+    <li>Per-site independent tracking</li>
+    <li>Real-time token counting using GPT tokenizer</li>
+    <li>Local-only privacy-first architecture</li>
+  </ul>
 </body>
 </html>
