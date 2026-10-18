@@ -106,9 +106,11 @@
 
   async function S() {
     let e = (await chrome.storage.local.get("waterTrackerState")).waterTrackerState || {
-      bySite: {}
+      bySite: {},
+      history: []
     };
     return e.bySite || (e.bySite = {}),
+      e.history = Array.isArray(e.history) ? e.history.slice(0, 100) : [],
       Object.values(e.bySite).forEach(o => {
         u[o.modelId] || (o.modelId = y)
       }),
@@ -136,6 +138,47 @@
     })
   }
 
+  function getActiveTabDetails() {
+    return new Promise(resolve => {
+      try {
+        chrome.tabs.query({
+          active: !0,
+          currentWindow: !0
+        }, tabs => {
+          const tab = tabs && tabs[0];
+          resolve(tab && tab.id != null ? tab : null);
+        });
+      } catch {
+        resolve(null);
+      }
+    });
+  }
+
+  async function getLiveModel(site) {
+    if (!E(site)) return null;
+    const tab = await getActiveTabDetails();
+    if (!tab || !tab.id) return null;
+    let hostname = null;
+    try {
+      hostname = tab.url ? new URL(tab.url).hostname : null;
+    } catch { }
+    if (hostname !== site || !chrome.tabs.sendMessage) return null;
+    return new Promise(resolve => {
+      try {
+        chrome.tabs.sendMessage(tab.id, { type: "GET_CURRENT_MODEL" }, response => {
+          if (chrome.runtime && chrome.runtime.lastError) {
+            resolve(null);
+            return;
+          }
+          const modelId = response && response.modelId;
+          resolve(u[modelId] ? modelId : null);
+        });
+      } catch {
+        resolve(null);
+      }
+    });
+  }
+
   function A(t) {
     let e = t / 500;
     return e < .001 ? "\u2248 0.1% of a 500 mL water bottle" : e < 1 ? `\u2248 ${(e * 100).toFixed(1)}% of a 500 mL water bottle` : `\u2248 ${e.toFixed(1)} water bottles (500 mL)`
@@ -145,10 +188,98 @@
     return Object.entries(u).map(([e, o]) => `<option value="${e}" ${e === t ? "selected" : ""}>${o.label}</option>`).join("")
   }
 
+  function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>'"]/g, character => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      "'": "&#39;",
+      '"': "&quot;"
+    }[character]));
+  }
+
+  function formatCompactNumber(value) {
+    const number = Number(value) || 0;
+    if (number >= 1000000) return `${(number / 1000000).toFixed(1)}M`;
+    if (number >= 1000) return `${(number / 1000).toFixed(1)}k`;
+    return String(Math.round(number));
+  }
+
+  function localDayKey(date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  }
+
+  function renderHistoryPanel(history, site) {
+    const entries = (Array.isArray(history) ? history : []).filter(entry => {
+      return entry && (!site || entry.site === site) && Number.isFinite(Number(entry.timestamp));
+    });
+    const siteLabel = site ? (w[site] || site) : "All sites";
+    const now = new Date();
+    const days = [];
+    for (let offset = 6; offset >= 0; offset -= 1) {
+      const date = new Date(now);
+      date.setHours(0, 0, 0, 0);
+      date.setDate(date.getDate() - offset);
+      days.push({
+        date,
+        key: localDayKey(date),
+        label: date.toLocaleDateString(undefined, { weekday: "short" }).slice(0, 2),
+        tokens: 0,
+        prompts: 0
+      });
+    }
+    const byDay = new Map(days.map(day => [day.key, day]));
+    entries.forEach(entry => {
+      const date = new Date(Number(entry.timestamp));
+      const day = byDay.get(localDayKey(date));
+      if (!day) return;
+      const promptTokens = Number(entry.promptTokens) || 0;
+      const responseTokens = Number(entry.responseTokens) || 0;
+      day.tokens += promptTokens + responseTokens;
+      day.prompts += 1;
+    });
+    const maxTokens = Math.max(...days.map(day => day.tokens), 1);
+    const bars = days.map(day => {
+      const height = day.tokens ? Math.max(10, Math.round(day.tokens / maxTokens * 100)) : 4;
+      return `<div class="trend-day" title="${escapeHtml(`${day.prompts} conversation${day.prompts === 1 ? "" : "s"}, ${formatCompactNumber(day.tokens)} tokens`)}">
+        <div class="trend-bar-track"><div class="trend-bar" style="height:${height}%"></div></div>
+        <span class="trend-day-label">${escapeHtml(day.label)}</span>
+      </div>`;
+    }).join("");
+    const recent = entries.slice().sort((a, b) => Number(b.timestamp) - Number(a.timestamp)).slice(0, 5);
+    const recentMarkup = recent.length ? recent.map(entry => {
+      const timestamp = new Date(Number(entry.timestamp));
+      const promptTokens = Number(entry.promptTokens) || 0;
+      const responseTokens = Number(entry.responseTokens) || 0;
+      const modelLabel = u[entry.modelId] ? u[entry.modelId].label : "Detected model";
+      return `<li class="history-item">
+        <div class="history-item-main">
+          <strong>${escapeHtml(modelLabel)}</strong>
+          <span>${escapeHtml(timestamp.toLocaleDateString(undefined, { month: "short", day: "numeric" }))} · ${escapeHtml(timestamp.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }))}</span>
+        </div>
+        <span class="history-item-tokens">${formatCompactNumber(promptTokens + responseTokens)} tokens</span>
+      </li>`;
+    }).join("") : '<li class="history-empty">No tracked conversations for this view yet.</li>';
+    return `<section class="history-panel" aria-label="Conversation history and trends">
+      <div class="history-panel-header">
+        <div>
+          <h3 class="section-title">Activity &amp; trends</h3>
+          <p class="history-subtitle">Last 7 days · ${escapeHtml(siteLabel)}</p>
+        </div>
+        <span class="history-count">${entries.length} chat${entries.length === 1 ? "" : "s"}</span>
+      </div>
+      <div class="trend-chart" role="img" aria-label="Token activity for the last 7 days">${bars}</div>
+      <div class="history-list-header">Recent conversations</div>
+      <ul class="history-list">${recentMarkup}</ul>
+    </section>`;
+  }
+
   function B(t, e) {
-    let o = u[e.modelId],
+    let o = u[e.modelId] || u[y],
       s = f[o.company],
-      a = e.promptTokens + e.responseTokens,
+      promptTokens = Number(e.promptTokens) || 0,
+      responseTokens = Number(e.responseTokens) || 0,
+      a = promptTokens + responseTokens,
       n = a * o.whPerToken,
       p = n * s.low,
       l = n * s.high,
@@ -157,7 +288,7 @@
       d = T[o.company] || o.company,
       m = o.tokenizerAccuracy === "exact" ? "Exact tokenizer" : "Approximate tokenizer",
       g = Math.min(Math.max(l / 20 * 100, 15), 100),
-      h = e.userOverride ? `Manually selected \xB7 <a href="#" id="autoDetectLink" data-site="${t}">Use auto-detect</a>` : "Auto-detected from page";
+      h = e.userOverride ? `Manually selected \xB7 <a href="#" id="autoDetectLink" data-site="${t}">Use auto-detect</a>` : e.liveDetected ? "Live model detected from page" : "Auto-detected from page";
     return `
     <div class="site-card" data-site="${t}">
       <div class="site-card-header">
@@ -203,14 +334,14 @@
             <svg class="metric-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 10 4 15 9 20"></polyline><path d="M20 4v7a4 4 0 0 1-4 4H4"></path></svg>
             <span class="metric-label">Prompt Tokens</span>
           </div>
-          <div class="metric-value">${e.promptTokens.toLocaleString()}</div>
+          <div class="metric-value">${promptTokens.toLocaleString()}</div>
         </div>
         <div class="metric-card">
           <div class="metric-header">
             <svg class="metric-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 14 20 9 15 4"></polyline><path d="M4 20v-7a4 4 0 0 1 4-4h12"></path></svg>
             <span class="metric-label">Response Tokens</span>
           </div>
-          <div class="metric-value">${e.responseTokens.toLocaleString()}</div>
+          <div class="metric-value">${responseTokens.toLocaleString()}</div>
         </div>
         <div class="metric-card accent">
           <div class="metric-header">
@@ -282,7 +413,7 @@
       <div class="empty-icon-wrapper"><span style="font-size: 24px;">\u{1F4A7}</span></div>
       <h3>No active AI chat detected</h3>
       <p class="empty-state-text">
-        Open ChatGPT, Claude, or Gemini and send a message -- this popup will
+        Open ChatGPT, Claude, Gemini, or DeepSeek and send a message -- this popup will
         automatically start tracking that site.
       </p>
       <button id="resetAllBtn" class="reset-site-btn" style="margin-top: 16px;">Reset everything</button>
@@ -297,6 +428,7 @@
     let e = await S(),
       o = Object.keys(e.bySite),
       s = await I(),
+      liveModelId = await getLiveModel(s),
       a = t || null;
     // Show all supported sites, not just ones with data
     // Use a Set to track seen display names and avoid duplicates
@@ -328,8 +460,13 @@
         responseTokens: 0,
         userOverride: !1
       };
+    if (a === s && liveModelId && !r.userOverride) {
+      r = { ...r, modelId: liveModelId, liveDetected: !0 };
+    }
     !a || !l && !b ? p.innerHTML = _() : p.innerHTML = B(a,
       r);
+    const historyPanel = document.getElementById("historyPanel");
+    historyPanel && (historyPanel.innerHTML = renderHistoryPanel(e.history, a));
     let d = document.getElementById("modelSelect");
     d && (d.value = r.modelId,
       d.addEventListener("change",
@@ -383,12 +520,16 @@
               
               // Check if there's data to export
               if (!state || !state.bySite || Object.keys(state.bySite).length === 0) {
-                alert('No data to export yet. Visit AI platforms and send some messages first!');
+                const btn=document.getElementById("exportDataBtn"),orig=btn.innerText;btn.innerText="No data!";setTimeout(()=>{btn.innerText=orig},2000);
                 return;
               }
 
               // 2. Generate CSV content
               const csvRows = [];
+              const escapeCsv = value => {
+                const text = String(value ?? '');
+                return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+              };
               
               // CSV Header
               csvRows.push('Site,Model,Prompts,Input Tokens,Output Tokens,Water (mL) Low,Water (mL) High,Energy (Wh),CO2 (g)');
@@ -398,7 +539,9 @@
                 const modelInfo = u[data.modelId];
                 if (!modelInfo) return;
                 
-                const totalTokens = data.promptTokens + data.responseTokens;
+                const promptTokens = Number(data.promptTokens) || 0;
+                const responseTokens = Number(data.responseTokens) || 0;
+                const totalTokens = promptTokens + responseTokens;
                 const energyWh = totalTokens * modelInfo.whPerToken;
                 const wueRange = f[modelInfo.company];
                 const waterLow = (energyWh * wueRange.low).toFixed(2);
@@ -410,13 +553,13 @@
                   siteName,
                   modelInfo.label,
                   data.prompts,
-                  data.promptTokens,
-                  data.responseTokens,
+                  promptTokens,
+                  responseTokens,
                   waterLow,
                   waterHigh,
                   energyWh.toFixed(4),
                   co2
-                ].join(',');
+                ].map(escapeCsv).join(',');
                 
                 csvRows.push(row);
               });
@@ -424,7 +567,7 @@
               const csvContent = csvRows.join('\n');
 
               // 3. Create a blob download link
-              const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+              const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
               const url = URL.createObjectURL(blob);
 
               const downloadAnchor = document.createElement('a');
@@ -467,7 +610,7 @@
       } catch { }
     });
   try {
-    localStorage.getItem("theme") === "dark" && document.body.classList.add("dark-theme")
+    (localStorage.getItem("theme")==="dark" || (!localStorage.getItem("theme") && window.matchMedia("(prefers-color-scheme: dark)").matches)) && document.body.classList.add("dark-theme")
   } catch { }
 
   var C = ["methodologyLink",
@@ -483,3 +626,68 @@
   });
   c();
 })();
+// Added for contact button
+document.addEventListener('DOMContentLoaded', () => {
+  const contactBtn = document.getElementById('contactBtn');
+  if (contactBtn) {
+    contactBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      chrome.windows.create({
+        url: 'https://mail.google.com/mail/u/0/?fs=1&tf=cm&to=ayushkumar44344@gmail.com',
+        type: 'popup',
+        width: 500,
+        height: 600
+      });
+    });
+  }
+});
+
+// Added for copy summary button
+document.addEventListener('DOMContentLoaded', () => {
+  const copyBtn = document.getElementById('copySummaryBtn');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', () => {
+      chrome.storage.local.get('waterTrackerState', (result) => {
+        const state = result.waterTrackerState;
+        if (!state || !state.bySite || Object.keys(state.bySite).length === 0) {
+          const orig = copyBtn.innerText;
+          copyBtn.innerText = 'No Data!';
+          setTimeout(() => copyBtn.innerText = orig, 2000);
+          return;
+        }
+        const selector = document.getElementById('siteSwitcher');
+        let site = selector && selector.value && state.bySite[selector.value]
+          ? selector.value
+          : Object.keys(state.bySite)[0];
+        const data = site ? state.bySite[site] : null;
+        if (!data) {
+          const orig = copyBtn.innerText;
+          copyBtn.innerText = 'No Data!';
+          setTimeout(() => copyBtn.innerText = orig, 2000);
+          return;
+        }
+
+        const promptTokens = Number(data.promptTokens) || 0;
+        const responseTokens = Number(data.responseTokens) || 0;
+        const text = `💧 AquaTrace Stats for ${site}\nPrompts: ${data.prompts}\nInput Tokens: ${promptTokens}\nOutput Tokens: ${responseTokens}\nTotal Tokens: ${promptTokens + responseTokens}`;
+
+        if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+          const orig = copyBtn.innerText;
+          copyBtn.innerText = 'Copy unavailable';
+          setTimeout(() => copyBtn.innerText = orig, 2000);
+          return;
+        }
+
+        navigator.clipboard.writeText(text).then(() => {
+          const orig = copyBtn.innerText;
+          copyBtn.innerText = 'Copied!';
+          setTimeout(() => copyBtn.innerText = orig, 2000);
+        }).catch(() => {
+          const orig = copyBtn.innerText;
+          copyBtn.innerText = 'Copy failed';
+          setTimeout(() => copyBtn.innerText = orig, 2000);
+        });
+      });
+    });
+  }
+});

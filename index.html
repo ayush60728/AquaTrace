@@ -18,7 +18,7 @@
 </head>
 <body>
   <h1>Privacy Policy — AquaTrace</h1>
-  <p><em>Last updated: July 2026</em></p>
+  <p><em>Last updated: October 2026</em></p>
 
   <h2>Summary</h2>
   <p>
@@ -29,7 +29,7 @@
 
   <h2>What the extension does</h2>
   <p>
-    When you send a message on ChatGPT, Claude, or Gemini, this extension
+    When you send a message on ChatGPT, Claude, Gemini, or DeepSeek, this extension
     reads the text of your prompt and the AI's response directly from the
     webpage in order to estimate a token count, and calculates an estimated
     water/energy/CO2 footprint from that count. This processing happens
@@ -39,7 +39,9 @@
   <h2>What data is stored, and where</h2>
   <p>
     The extension stores only aggregate numbers -- prompt counts and token
-    counts per site -- using Chrome's built-in local extension storage
+    counts per site -- plus up to 100 local conversation summaries containing
+    timestamps, site, model, and token counts. It uses Chrome's built-in local
+    extension storage
     (<code>chrome.storage.local</code>). This data:
   </p>
   <ul>
@@ -54,7 +56,7 @@
   <ul>
     <li><strong>storage</strong> -- to save your running token counts locally, so they persist between browser sessions.</li>
     <li><strong>activeTab</strong> -- to detect which supported AI site your current tab is on, only at the moment you open the extension's popup.</li>
-    <li><strong>Host access to chatgpt.com, chat.openai.com, claude.ai, and gemini.google.com</strong> -- to read prompt/response text on those specific pages in order to count tokens. No other websites are accessed.</li>
+    <li><strong>Host access to chatgpt.com, chat.openai.com, claude.ai, gemini.google.com, and chat.deepseek.com</strong> -- to read prompt/response text on those specific pages in order to count tokens. No other websites are accessed.</li>
   </ul>
 
   <h2>Third parties</h2>

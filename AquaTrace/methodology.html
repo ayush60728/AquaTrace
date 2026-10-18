@@ -2,35 +2,10 @@
 <html>
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="icons/icon16.png">
   <title>Methodology - AquaTrace</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      max-width: 640px;
-      margin: 40px auto;
-      padding: 0 20px;
-      color: #1a2b3c;
-      line-height: 1.6;
-    }
-    h1 { color: #0d3b66; }
-    h2 { color: #0d3b66; margin-top: 28px; font-size: 17px; }
-    code {
-      background: #eaf3ff;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 13px;
-    }
-    .privacy-badge {
-      background: #eafff0;
-      border: 1px solid #b8f0cc;
-      border-radius: 8px;
-      padding: 12px 16px;
-      margin: 16px 0;
-    }
-    table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 13px; }
-    td, th { border: 1px solid #e0ecf9; padding: 6px 10px; text-align: left; }
-    th { background: #f4f9ff; }
-  </style>
+  <link rel="stylesheet" href="methodology.css" />
 </head>
 <body>
   <h1>💧 How this extension calculates your estimate</h1>
@@ -42,12 +17,7 @@
     storage until you clear it or uninstall the extension.
   </div>
 
-  <h2>✨ What's New in Version 1.1.0</h2>
-  <ul>
-    <li><strong>DeepSeek Support:</strong> Now tracks DeepSeek V3 and DeepSeek R1 models with accurate energy estimates</li>
-    <li><strong>Export Functionality:</strong> Download your complete environmental footprint data as a CSV file for record-keeping or analysis</li>
-    <li><strong>Enhanced Accuracy:</strong> Updated energy and water usage estimates based on latest research</li>
-  </ul>
+  <p><a href="#version-history">View changelog</a></p>
 
   <h2>0. Each site is tracked independently</h2>
   <p>
@@ -66,17 +36,19 @@
   <h2>1. Counting tokens</h2>
   <p>
     We use <code>gpt-tokenizer</code>, a JavaScript implementation of OpenAI's
-    real tokenizer (the same byte-pair-encoding scheme used by GPT-4o and
-    GPT-5), to count tokens in whatever text is typed into the chat box and
-    whatever text gets added to the page in response.
+    real tokenizer. The bundled tokenizer uses the same byte-pair-encoding scheme
+    as GPT-4o and is also used as a proxy for the GPT-5 profile until a GPT-5
+    tokenizer is available. It counts tokens in whatever text is typed into the
+    chat box and whatever text gets added to the page in response.
   </p>
   <p>
-    For GPT-4o Mini and GPT-5, this is the model's <strong>actual</strong>
-    tokenizer, so counts are exact. For Claude and Gemini models, neither
-    Anthropic nor Google publish an installable tokenizer library, so we reuse
-    the OpenAI tokenizer as a stand-in. Token boundaries will differ slightly
-    from what those models really use internally, but total counts land in a
-    similar range for ordinary English text.
+    For GPT-4o Mini and GPT-4o, this is the model's <strong>actual</strong>
+    tokenizer, so counts are exact. The GPT-5 profile currently reuses the
+    bundled GPT-4o tokenizer until a GPT-5 tokenizer is available. For Claude and
+    Gemini models, neither Anthropic nor Google publish an installable tokenizer
+    library, so we reuse the OpenAI tokenizer as a stand-in. Token boundaries will
+    differ slightly from what those models really use internally, but total counts
+    land in a similar range for ordinary English text.
   </p>
 
   <h2>2. Detecting when a response finished</h2>
@@ -85,21 +57,22 @@
     page stays quiet for 1.5 seconds, we treat the response as finished and
     tokenize whatever text was added during that time.
   </p>
+  <p><em>Caveat:</em> Long reasoning responses (like those from o1 or DeepSeek R1) that pause for more than 1.5s mid-generation may get split into two tokenize events, which can occasionally result in undercounting.</p>
 
   <h2>3. Turning tokens into energy</h2>
   <p>Each model profile has an estimated energy cost per token, in watt-hours:</p>
-  <table>
+  <div class="table-wrapper"><table>
     <tr><th>Model</th><th>Est. Wh / token</th><th>Basis</th></tr>
     <tr><td>GPT-4o Mini</td><td>0.0001</td><td>Small, efficiency-optimized model class</td></tr>
     <tr><td>GPT-4o</td><td>0.0006</td><td>Mid-large model class -- roughly 6x Mini's cost, consistent with GPT-4o costing ~16x more per token in API pricing</td></tr>
-    <tr><td>GPT-5</td><td>0.0025</td><td>Large frontier / extended-reasoning model class</td></tr>
+    <tr><td>GPT-5 (when available)</td><td>0.0025</td><td>Large frontier / extended-reasoning model class</td></tr>
     <tr><td>Claude Sonnet</td><td>0.0006</td><td>Mid-large model class</td></tr>
     <tr><td>Claude Opus</td><td>0.0018</td><td>Large model class</td></tr>
     <tr><td>Gemini Flash</td><td>0.00012</td><td>Small, efficiency-optimized model class</td></tr>
     <tr><td>Gemini Pro</td><td>0.0008</td><td>Mid-large model class</td></tr>
     <tr><td>DeepSeek V3</td><td>0.001</td><td>Large MoE model class (671B total / 37B active params) -- no clean published figure exists specifically for V3, so this is estimated relative to similarly-sized models</td></tr>
     <tr><td>DeepSeek R1</td><td>0.0029</td><td>Derived from a benchmark measuring 33.634 Wh for a long exchange of ~11,500 total tokens. R1's well-publicized high per-query energy use mostly reflects generating far more output tokens via chain-of-thought reasoning, not a dramatically worse per-token rate</td></tr>
-  </table>
+  </table></div>
   <p>
     <strong>None of these are official, disclosed figures</strong> — no AI
     company publishes exact energy-per-token numbers. These are directional
@@ -123,7 +96,7 @@
     the company that actually hosts it, since AWS, Microsoft Azure, and
     Google run meaningfully different infrastructure.
   </p>
-  <table>
+  <div class="table-wrapper"><table>
     <tr><th>Hosting company</th><th>Used by</th><th>WUE range (L/kWh)</th><th>Basis</th></tr>
     <tr>
       <td>Amazon / AWS</td>
@@ -133,7 +106,7 @@
     </tr>
     <tr>
       <td>Microsoft Azure</td>
-      <td>GPT-4o Mini, GPT-5</td>
+      <td>GPT-4o Mini, GPT-5 (when available)</td>
       <td>0.30 – 1.52</td>
       <td>Microsoft's reported fleet-wide figure, up to a reported high-water-use region (Arizona)</td>
     </tr>
@@ -149,7 +122,7 @@
       <td>1.0 – 3.0</td>
       <td>Rough placeholder using general industry-wide WUE figures -- no major Chinese cloud operator publishes a fleet-wide WUE figure at all, so this is the least certain of the four company estimates</td>
     </tr>
-  </table>
+  </table></div>
   <p>
     <strong>Important caveat on Anthropic and Claude specifically:</strong>
     Anthropic's Claude models run on multiple cloud providers, not exclusively
@@ -172,22 +145,7 @@
   </ul>
 
   <h2>6. Exporting your data</h2>
-  <p>
-    The extension includes an <strong>export feature</strong> that allows you to download all your tracked usage data 
-    as a CSV (comma-separated values) file. This includes:
-  </p>
-  <ul>
-    <li>Per-site breakdown of prompts sent and tokens used</li>
-    <li>Model selection for each AI service</li>
-    <li>Calculated water consumption (in mL, with low/high range)</li>
-    <li>Energy usage (in watt-hours)</li>
-    <li>CO₂ emissions (in grams)</li>
-  </ul>
-  <p>
-    The exported data is perfect for personal record-keeping, academic research, or simply understanding your 
-    AI usage patterns over time. The export button is available in the popup interface, and the generated CSV 
-    can be opened in any spreadsheet application (Excel, Google Sheets, LibreOffice, etc.).
-  </p>
+  <p>The extension includes an export feature to download usage data as a CSV. It contains: Site, Model, Prompts, Input Tokens, Output Tokens, Water (mL) Low/High, Energy (Wh), and CO₂ (g). The Copy Summary action copies the selected site's prompt and response totals to the clipboard. The popup also keeps up to 100 local conversation summaries and shows a seven-day token trend; conversation text is never stored.</p>
 
   <h2>Bottom line</h2>
   <p>
@@ -197,8 +155,23 @@
     conversation length and model size — rather than a precise figure.
   </p>
 
-  <h2>Version History & Features</h2>
-  <p><strong>Version 1.1.0</strong> (Current)</p>
+  <h2 id="version-history">Version History & Features</h2>
+  <p><strong>Version 1.2.0</strong> (Current)</p>
+  <ul>
+    <li>Added site-specific assistant-response adapters for supported AI sites.</li>
+    <li>Added live current-model detection when the popup is opened.</li>
+    <li>Added local conversation history and seven-day token trends.</li>
+    <li>Broadened model detection beyond button text to include accessible labels, titles, test IDs, and model headings.</li>
+  </ul>
+
+  <p><strong>Version 1.1.1</strong></p>
+  <ul>
+    <li>Prevented concurrent prompts from overwriting each other's stored totals.</li>
+    <li>Improved capture of streamed response text that updates existing DOM text nodes.</li>
+    <li>Added a working Copy Summary action for the selected site.</li>
+  </ul>
+
+  <p><strong>Version 1.1.0</strong></p>
   <ul>
     <li>Added support for DeepSeek V3 and DeepSeek R1 models</li>
     <li>Implemented CSV export functionality for all usage data</li>
@@ -206,6 +179,7 @@
     <li>Enhanced company-specific WUE and carbon intensity calculations for Chinese infrastructure</li>
     <li>Improved UI with better dark theme support</li>
   </ul>
+
   <p><strong>Version 1.0.0</strong></p>
   <ul>
     <li>Initial release with support for ChatGPT, Claude, and Gemini</li>

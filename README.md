@@ -7,10 +7,10 @@ This document describes how AquaTrace's pieces fit together. For feature docs an
 ```mermaid
 graph LR
     %% ── Browser Tab ──────────────────────────────────────
-    subgraph TAB["🌐 Browser Tab (chatgpt.com / claude.ai / gemini.google.com)"]
+    subgraph TAB["🌐 Browser Tab (supported AI chat sites)"]
         direction TB
         DOM["Page DOM\n(prompt input + streaming response)"]
-        CS["content.js\n(content script)"]
+        CS["dist/content.bundle.js\n(content script)"]
         TOK["gpt-tokenizer\n(bundled, o200k_base)"]
         DOM -->|"Enter / send click"| CS
         CS -->|"count tokens"| TOK
@@ -19,8 +19,8 @@ graph LR
     %% ── Extension Runtime ────────────────────────────────
     subgraph EXT["🧩 Extension Runtime"]
         direction TB
-        BG["background.js\n(service worker)"]
-        CFG["modelProfiles.js\n(shared config)"]
+        BG["dist/background.bundle.js\n(service worker)"]
+        CFG["model profile constants\n(bundled)"]
         STORE["chrome.storage.local\n(per-site state)"]
         BG --> CFG
         BG <--> STORE
@@ -29,7 +29,7 @@ graph LR
     %% ── Popup UI ─────────────────────────────────────────
     subgraph POPUP["💧 Popup UI (on click)"]
         direction TB
-        UI["popup.js"]
+        UI["dist/popup.bundle.js"]
         UI --> CFG
     end
 
@@ -44,33 +44,33 @@ graph LR
 
 | Component | Role |
 
-| **`content.js`** (content script) | Injected into supported AI chat pages only. Detects when a prompt is submitted and when a response finishes streaming, counts tokens for both using the bundled tokenizer, scans the page for the currently selected model name, and sends the result to the background script. Never sends the actual conversation text anywhere only token counts. |
-| **`background.js`** (service worker) | The only long lived piece. Owns all persisted state in `chrome.storage.local`, keyed per site. Applies auto detected models unless the user has manually overridden that site's choice. Handles reset requests. |
-| **`popup.js`** (popup UI) | Runs only while the popup is open. Determines which site's card to show by querying the active tab, reads state from storage, and renders it. Sends messages to the background script for any state changes (model picks, resets) rather than writing storage directly. |
-| **`modelProfiles.js`** (shared config) | Not a running component a shared data module imported by `content.js`, `background.js`, and `popup.js` alike, so all three always agree on model energy values, percompany water efficiency ranges, and model detection keyword patterns. |
+| **`dist/content.bundle.js`** (content script) | Injected into supported AI chat pages only. Detects when a prompt is submitted and when a response finishes streaming, counts tokens for both using the bundled tokenizer, scans the page for the currently selected model name, and sends the result to the background script. Never sends the actual conversation text anywhere only token counts. |
+| **`dist/background.bundle.js`** (service worker) | The only long lived piece. Owns all persisted state in `chrome.storage.local`, keyed per site. Applies auto detected models unless the user has manually overridden that site's choice. Handles reset requests. |
+| **`dist/popup.bundle.js`** (popup UI) | Runs only while the popup is open. Determines which site's card to show by querying the active tab, reads state from storage, and renders it. Sends messages to the background script for any state changes (model picks, resets) rather than writing storage directly. |
+| **Model profile constants** (bundled) | The current repository commits generated bundles rather than a shared source module, so profile values and detection rules are duplicated across the background, popup, and content bundles. Keep them synchronized or add a reproducible build source before changing model data. |
 | **`chrome.storage.local`** | The only persistence layer. Never synced, never transmitted local to the browser profile. |
 
 ## Why this shape
 
 - **Content script never talks to storage directly.** It only ever sends a message to the background script, which is the single source of truth for state. This avoids race conditions if multiple tabs on the same site are open at once.
 - **Popup never runs in the background.** It only exists while open, so it always re derives "which site am I looking at" fresh from `chrome.tabs.query` rather than trying to stay in sync with a background process.
-- **Shared config, not duplicated constants.** Because `modelProfiles.js` is imported by all three surfaces, an update to a model's energy estimate or detection pattern only needs to happen in one place.
+- **Single source of truth is still a follow-up.** The generated bundles currently contain duplicated model configuration; changing a model's energy estimate or detection pattern requires updating each affected bundle consistently.
 
 ## Data flow for a single prompt (end to end)
 
 1. User types in the chat page and hits Enter.
-2. `content.js` captures the prompt text, tokenizes it, and starts watching the page for the response.
-3. Once the page goes quiet for 1.5s, `content.js` tokenizes the response text and scans the page for the active model's name.
-4. `content.js` sends `PROMPT_SENT` (site, promptTokens, responseTokens, detectedModelId) to `background.js`.
-5. `background.js` updates that site's entry in `chrome.storage.local` incrementing counts, and updating the model only if the user hasn't manually overridden it.
-6. Next time the popup is opened, `popup.js` reads that entry, applies the current model's Wh/token and the hosting company's WUE range, and renders the result.
+2. `dist/content.bundle.js` captures the prompt text, tokenizes it, and starts watching the page for the response.
+3. Once the page goes quiet for 1.5s, `dist/content.bundle.js` tokenizes the response text and scans the page for the active model's name.
+4. `dist/content.bundle.js` sends `PROMPT_SENT` (site, promptTokens, responseTokens, detectedModelId) to `dist/background.bundle.js`.
+5. `dist/background.bundle.js` updates that site's entry in `chrome.storage.local` incrementing counts, and updating the model only if the user hasn't manually overridden it.
+6. Next time the popup is opened, `dist/popup.bundle.js` reads that entry, applies the current model's Wh/token and the hosting company's WUE range, and renders the result.
 
 
 
 
 # 💧 AquaTrace - AI Environmental Footprint Tracker
 
-**Version 1.1.0**
+**Version 1.2.0**
 
 AquaTrace is a browser extension that estimates the water, energy, and CO₂ footprint of your AI chat conversations across ChatGPT, Claude, Gemini, and DeepSeek.
 
@@ -89,13 +89,21 @@ AquaTrace is a browser extension that estimates the water, energy, and CO₂ foo
 - **Enhanced Accuracy**: Updated energy estimates based on latest research
 - **Improved UI**: Better dark mode support and visual polish
 
+### Version 1.2.0 updates
+- **Copy Summary**: Copy the selected site's token totals to the clipboard
+- Serializes background storage updates so simultaneous prompts are not lost
+- Captures streamed text updates made to existing response text nodes
+- Uses site-specific assistant-response adapters to reduce UI and prompt-text contamination
+- Shows the live model detected on the current AI chat page
+- Stores up to 100 local conversation summaries and displays seven-day token trends
+
 ## 📊 Supported Models
 
 | Model | Energy per Token | Tokenizer | Company/Host |
 |-------|------------------|-----------|--------------|
 | GPT-4o Mini | 0.0001 Wh | Exact | Microsoft Azure |
 | GPT-4o | 0.0006 Wh | Exact | Microsoft Azure |
-| GPT-5 | 0.0025 Wh | Exact | Microsoft Azure |
+| GPT-5 | 0.0025 Wh | GPT-4o proxy | Microsoft Azure |
 | Claude Sonnet | 0.0006 Wh | Approx | Amazon AWS |
 | Claude Opus | 0.0018 Wh | Approx | Amazon AWS |
 | Gemini Flash | 0.00012 Wh | Approx | Google Cloud |
@@ -160,7 +168,7 @@ Perfect for:
 - No data collection
 - No third-party services
 - No conversation text transmitted
-- Data stored only in browser's local storage
+- Aggregate totals and up to 100 local conversation summaries stored only in browser's local storage
 
 Clear your data anytime by clicking "Reset All Sites" or uninstalling the extension.
 

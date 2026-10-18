@@ -1,9 +1,12 @@
 {
   "manifest_version": 3,
   "name": "AquaTrace",
-  "version": "1.1.0",
-  "description": "AquaTrace estimates the water, energy & CO2 footprint of your ChatGPT, Claude, Gemini & DeepSeek chats, calculated locally.",
-  "permissions": ["storage", "activeTab"],
+  "version": "1.2.0",
+  "description": "Estimate the water, energy & CO2 footprint of ChatGPT, Claude, Gemini & DeepSeek chats. 100% local, no data sent to any server.",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
@@ -29,14 +32,14 @@
         "https://gemini.google.com/*",
         "https://chat.deepseek.com/*"
       ],
-      "js": ["dist/content.bundle.js"],
+      "js": [
+        "dist/content.bundle.js"
+      ],
       "run_at": "document_idle"
     }
   ],
-  "web_accessible_resources": [
-    {
-      "resources": ["methodology.html"],
-      "matches": ["<all_urls>"]
-    }
-  ]
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self';"
+  },
+  "minimum_chrome_version": "114"
 }

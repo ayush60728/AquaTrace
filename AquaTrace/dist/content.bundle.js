@@ -4364,20 +4364,138 @@ ${i}}`
     function ra(n) {
         let e = ye[n];
         if (!e) return null;
-        let a = document.querySelectorAll("button, [role='button']");
-        for (let i of a) {
-            let r = (i.innerText || "").trim();
-            if (!(!r || r.length > 30)) {
+        let a = document.querySelectorAll("button, [role='button'], [aria-label], [title], [data-testid], h1, h2, h3, [class*='model'], [class*='Model']");
+        for (let r of a) {
+            let t = [r.innerText, r.getAttribute && r.getAttribute("aria-label"), r.getAttribute && r.getAttribute("title"), r.getAttribute && r.getAttribute("data-testid")];
+            for (let a of t) {
+                let i = (a || "").trim();
+                if (!i || i.length > 80 || i === "model") continue;
                 for (let t of e)
-                    if (t.regex.test(r)) return m("model detected from page text:", JSON.stringify(r), "->", t.modelId), t.modelId
+                    if (t.regex.test(i)) return m("model detected from page text:", JSON.stringify(i), "->", t.modelId), t.modelId
             }
         }
         return m("could not auto-detect model from page (no matching button text found)"), null
     }
 
+    var responseExtractionAdapters = {
+        "chatgpt.com": {
+            selectors: [
+                "[data-message-author-role='assistant']",
+                "[data-testid='conversation-turn-assistant']"
+            ],
+            contentSelectors: [".markdown", ".prose", "[class*='markdown']"]
+        },
+        "claude.ai": {
+            selectors: [
+                "[data-testid='assistant-message']",
+                "[data-testid='chat-message'][data-role='assistant']",
+                "[data-message-author-role='assistant']",
+                "[data-role='assistant']"
+            ],
+            contentSelectors: [".font-claude-message", ".prose", "[class*='markdown']"]
+        },
+        "gemini.google.com": {
+            selectors: [
+                "model-response",
+                "[data-message-author-role='model']",
+                "[data-role='model']",
+                "[data-role='assistant']",
+                ".model-response-text"
+            ],
+            contentSelectors: [".model-response-text", "message-content", ".markdown", "[class*='response-content']"]
+        },
+        "chat.deepseek.com": {
+            selectors: [
+                "[data-role='assistant']",
+                "[data-message-author-role='assistant']",
+                "[data-testid='assistant-message']",
+                ".ds-message--assistant",
+                ".ds-markdown"
+            ],
+            contentSelectors: [".ds-markdown", ".markdown", "[class*='markdown']"]
+        }
+    };
+    responseExtractionAdapters["chat.openai.com"] = responseExtractionAdapters["chatgpt.com"];
+
+    function findResponseContainers(n) {
+        if (!n) return [];
+        let i = [];
+        for (let e of n.selectors || []) {
+            let a;
+            try {
+                a = document.querySelectorAll(e)
+            } catch {
+                a = null
+            }
+            if (!a || !a.length) continue;
+            for (let r = 0; r < a.length; r++) {
+                let t = a[r];
+                i.includes(t) || i.push(t)
+            }
+        }
+        return i
+    }
+
+    function getLatestResponseContainer(n) {
+        let e = findResponseContainers(n);
+        if (!e.length) return null;
+        let a = e[0];
+        for (let i = 1; i < e.length; i++) {
+            let r = e[i];
+            if (typeof a.compareDocumentPosition == "function") {
+                a.compareDocumentPosition(r) & 4 && (a = r)
+            } else a = r
+        }
+        return a
+    }
+
+    function collectVisibleResponseText(n) {
+        if (!n) return "";
+        if (n.nodeType === Node.TEXT_NODE) return n.textContent || "";
+        if (n.nodeType !== Node.ELEMENT_NODE || na(n)) return "";
+        if (!n.childNodes || !n.childNodes.length) return n.innerText || n.textContent || "";
+        let e = "";
+        for (let a of n.childNodes || []) e += collectVisibleResponseText(a);
+        return e
+    }
+
+    function extractResponseText(n, e) {
+        if (!e) return "";
+        for (let a of n.contentSelectors || []) {
+            let i;
+            try {
+                i = e.querySelector(a)
+            } catch {
+                i = null
+            }
+            if (i) {
+                let r = collectVisibleResponseText(i);
+                if (r.trim()) return r
+            }
+        }
+        return collectVisibleResponseText(e)
+    }
+
+    function responseTextDelta(n, e) {
+        if (!e) return "";
+        if (!n) return e;
+        if (n === e) return "";
+        if (e.startsWith(n)) return e.slice(n.length);
+        let a = 0;
+        for (; a < n.length && a < e.length && n[a] === e[a]; a++);
+        return e.slice(a)
+    }
+
     function ta() {
         return typeof chrome < "u" && !!chrome.runtime && !!chrome.runtime.id
     }
+
+    typeof chrome < "u" && chrome.runtime && chrome.runtime.onMessage && chrome.runtime.onMessage.addListener && chrome.runtime.onMessage.addListener((n, e, a) => {
+        if (!n || n.type !== "GET_CURRENT_MODEL") return;
+        typeof a == "function" && a({
+            modelId: ra(window.location.hostname)
+        })
+    });
     var _e = !1;
 
     function oa(n) {
@@ -4395,28 +4513,63 @@ ${i}}`
     }
 
     function sa(n) {
-        let e = Se(n);
-        m("prompt captured:", JSON.stringify(n.slice(0, 80)), "-> tokens:", e), G = "", T && T.disconnect(), F && clearTimeout(F), T = new MutationObserver(i => {
-            for (let r of i) r.addedNodes.forEach(t => {
-                na(t) || (G += aa(t))
-            });
+        let e = Se(n),
+            c = new WeakMap,
+            r = ia(),
+            t = responseExtractionAdapters[window.location.hostname] || null,
+            o = t ? getLatestResponseContainer(t) : null,
+            s = o ? extractResponseText(t, o) : "",
+            l = o,
+            d = !!o;
+        ! function n(e) {
+            if (e.nodeType === Node.TEXT_NODE) {
+                c.set(e, e.textContent || "");
+                return
+            }
+            for (let t of e.childNodes || []) n(t)
+        }(r), m("prompt captured:", JSON.stringify(n.slice(0, 80)), "-> tokens:", e), G = "", T && T.disconnect(), F && clearTimeout(F), T = new MutationObserver(i => {
+            for (let r of i)
+                if (r.type === "characterData") {
+                    let t = r.target;
+                    if (!d && !na(t)) {
+                        let n = t.textContent || "",
+                            e = c.get(t);
+                        c.set(t, n), e === void 0 ? G += n : n.startsWith(e) ? G += n.slice(e.length) : n !== e && (G += n)
+                    }
+                } else r.addedNodes.forEach(t => {
+                    if (d) return;
+                    if (na(t)) return;
+                    G += aa(t), function n(e) {
+                        if (e.nodeType === Node.TEXT_NODE) {
+                            c.set(e, e.textContent || "");
+                            return
+                        }
+                        for (let t of e.childNodes || []) n(t)
+                    }(t)
+                });
+            if (t) {
+                let e = getLatestResponseContainer(t);
+                e && (d = !0, l = e)
+            }
             clearTimeout(F), F = setTimeout(a, ea)
-        }), T.observe(ia(), {
+        }), T.observe(r, {
             childList: !0,
+            characterData: !0,
             subtree: !0
         }), m("watching for response...");
 
         function a() {
             T.disconnect();
-            let i = Se(G);
-            m("response settled. buffer length:", G.length, "-> tokens:", i);
-            let r = ra(window.location.hostname);
+            let i = l && d ? responseTextDelta(l === o ? s : "", extractResponseText(t, l)) : G,
+                r = Se(i);
+            m("response settled. buffer length:", i.length, "-> tokens:", r);
+            let detectedModelId = ra(window.location.hostname);
             oa({
                 type: "PROMPT_SENT",
                 site: window.location.hostname,
                 promptTokens: e,
-                responseTokens: i,
-                detectedModelId: r
+                responseTokens: r,
+                detectedModelId
             })
         }
     }

@@ -65,10 +65,12 @@
   };
 
   var p = "gpt-4o-mini";
+  const HISTORY_LIMIT = 100; // state.history is retained newest first.
 
   async function n() {
-    let r = (await chrome.storage.local.get("waterTrackerState")).waterTrackerState || { bySite: {} };
+    let r = (await chrome.storage.local.get("waterTrackerState")).waterTrackerState || { bySite: {}, history: [] };
     r.bySite || (r.bySite = {});
+    r.history = Array.isArray(r.history) ? r.history.slice(0, HISTORY_LIMIT) : [];
     Object.values(r.bySite).forEach(t => {
       c[t.modelId] || (t.modelId = p);
     });
@@ -76,9 +78,19 @@
   }
 
   async function i(e) {
-    await chrome.storage.local.set({ waterTrackerState: e });
+    try { await chrome.storage.local.set({ waterTrackerState: e }); } catch(err) { chrome.action.setBadgeText({ text: "ERR" }); return !1; }
     let r = Object.values(e.bySite).reduce((t, o) => t + o.prompts, 0);
     l(r);
+    return !0;
+  }
+
+  let operationQueue = Promise.resolve();
+
+  function enqueueOperation(e, r) {
+    let t = operationQueue.then(e);
+    operationQueue = t.catch(() => {});
+    t.then(e => r({ ok: e !== !1 }), () => r({ ok: !1 }));
+    return !0;
   }
 
   function l(e) {
@@ -102,37 +114,52 @@
 
   chrome.runtime.onMessage.addListener((e, r, t) => {
     if (e.type === "PROMPT_SENT")
-      return (async () => {
+      return enqueueOperation(async () => {
         let o = await n(),
           a = d(o, e.site);
+        let promptTokens = e.promptTokens || 0,
+          responseTokens = e.responseTokens || 0;
         a.prompts += 1;
-        a.promptTokens += e.promptTokens || 0;
-        a.responseTokens += e.responseTokens || 0;
+        a.promptTokens += promptTokens;
+        a.responseTokens += responseTokens;
         !a.userOverride && e.detectedModelId && c[e.detectedModelId] && (a.modelId = e.detectedModelId);
-        await i(o);
-        t({ ok: !0 });
-      })(), !0;
+        o.history.unshift({
+          timestamp: Date.now(),
+          site: e.site,
+          modelId: a.modelId,
+          promptTokens: promptTokens,
+          responseTokens: responseTokens
+        });
+        o.history.length = Math.min(o.history.length, HISTORY_LIMIT);
+        return i(o);
+      }, t);
 
     if (e.type === "SET_MODEL")
-      return (async () => {
+      return enqueueOperation(async () => {
         let o = await n(),
           a = d(o, e.site);
-        c[e.modelId] && (a.modelId = e.modelId, a.userOverride = !0, await i(o));
-        t({ ok: !0 });
-      })(), !0;
+        if (c[e.modelId]) {
+          a.modelId = e.modelId;
+          a.userOverride = !0;
+          return i(o);
+        }
+      }, t);
 
     if (e.type === "USE_AUTO_DETECT")
-      return (async () => {
+      return enqueueOperation(async () => {
         let o = await n(),
           a = d(o, e.site);
+        let defaultModel = s[e.site] || p;
+        a.modelId = c[defaultModel] ? defaultModel : p;
         a.userOverride = !1;
-        await i(o);
-        t({ ok: !0 });
-      })(), !0;
+        return i(o);
+      }, t);
 
     if (e.type === "RESET_SITE")
-      return (async () => {
+      return enqueueOperation(async () => {
         let o = await n();
+        let historyLength = o.history.length;
+        o.history = o.history.filter(a => a.site !== e.site);
         if (o.bySite[e.site]) {
           let a = o.bySite[e.site].modelId;
           let userPref = o.bySite[e.site].userOverride || !1;
@@ -143,13 +170,13 @@
             responseTokens: 0,
             userOverride: userPref
           };
-          await i(o);
+          return i(o);
         }
-        t({ ok: !0 });
-      })(), !0;
+        if (o.history.length !== historyLength) return i(o);
+      }, t);
 
     if (e.type === "RESET_ALL")
-      return (async () => (await i({ bySite: {} }), t({ ok: !0 })))(), !0;
+      return enqueueOperation(() => i({ bySite: {}, history: [] }), t);
   });
 
   chrome.runtime.onInstalled.addListener(async () => {
