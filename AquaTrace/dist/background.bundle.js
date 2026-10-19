@@ -1,4 +1,6 @@
 (() => {
+  try { importScripts("../aon-config.js"); } catch (error) { /* tests may provide config directly */ }
+
   var c = {
     "gpt-4o-mini": {
       label: "GPT-4o Mini",
@@ -67,6 +69,120 @@
   var p = "gpt-4o-mini";
   const HISTORY_LIMIT = 100; // state.history is retained newest first.
 
+  const AON_PROTOCOL_VERSION = "1.0";
+  const AON_SANDBOX_PLACEMENT_ID = "plc_public_test_sandbox";
+  const AON_DEFAULT_ORIGIN = "https://api.aon.pro";
+  const AON_QUERY_TIMEOUT_MS = 8000;
+
+  function getAonConfig() {
+    const config = globalThis.AON_CONFIG || {};
+    return {
+      placementId: String(config.placementId || globalThis.AON_PLACEMENT_ID || "").trim(),
+      apiOrigin: String(config.apiOrigin || AON_DEFAULT_ORIGIN).replace(/\/$/, ""),
+      // A key is only valid for the public sandbox. Live Offer Query calls do
+      // not send an API key, and this value is absent from the live config.
+      apiKey: config.apiKey ? String(config.apiKey).trim() : ""
+    };
+  }
+
+  function safeOfferUrl(value) {
+    try {
+      const url = new URL(String(value || ""));
+      return url.protocol === "https:" && !url.username && !url.password ? url.href : "";
+    } catch {
+      return "";
+    }
+  }
+
+  function normalizeAonOffer(offer) {
+    const info = offer && offer.offer_info;
+    const action = offer && offer.action;
+    const commercial = info && info.commercial;
+    const displayPrice = commercial && (commercial.display_price || commercial.price);
+    if (!offer || !info || !action || !action.payload || !info.title) return null;
+    const actionUrl = safeOfferUrl(action.payload.url);
+    if (!actionUrl) return null;
+    return {
+      offerId: typeof offer.offer_id === "string" ? offer.offer_id : "",
+      offerInstanceId: typeof offer.offer_instance_id === "string" ? offer.offer_instance_id : "",
+      title: String(info.title),
+      description: String(info.short_description || info.description || ""),
+      entityName: offer.entity && typeof offer.entity.name === "string" ? offer.entity.name : "",
+      price: displayPrice && displayPrice.amount ? String(displayPrice.amount) : "",
+      currency: displayPrice && displayPrice.currency ? String(displayPrice.currency) : "",
+      actionUrl,
+      actionName: action.name ? String(action.name) : "Learn more",
+      matchReason: offer.match_reason ? String(offer.match_reason) : "",
+      offerType: info.offer_type ? String(info.offer_type) : ""
+    };
+  }
+
+  async function queryAonOffers(intentText) {
+    const intent = String(intentText || "").trim();
+    if (!intent || intent.length > 200) {
+      return { ok: false, code: "INVALID_INTENT", message: "Enter an intent between 1 and 200 characters." };
+    }
+
+    const config = getAonConfig();
+    if (!config.placementId) {
+      return { ok: false, code: "AON_NOT_CONFIGURED", message: "Offers are not configured yet." };
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), AON_QUERY_TIMEOUT_MS);
+    const headers = {
+      "Content-Type": "application/json",
+      "AON-Protocol-Version": AON_PROTOCOL_VERSION,
+      "X-AON-Placement-Id": config.placementId
+    };
+    // The public test pair is the only supported API-key path for this client.
+    if (config.placementId === AON_SANDBOX_PLACEMENT_ID && config.apiKey) {
+      headers.Authorization = `Bearer ${config.apiKey}`;
+    }
+
+    const requestBody = {
+      intent: {
+        content: [{ type: "input_text", text: intent }],
+        provenance: "user_expressed"
+      },
+      context: {
+        platform: { name: "AquaTrace", channel: "browser_extension" }
+      }
+    };
+
+    try {
+      const response = await fetch(`${config.apiOrigin}/v1/offers/query`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(requestBody),
+        signal: controller.signal
+      });
+      let payload = null;
+      try { payload = await response.json(); } catch { payload = null; }
+      if (!response.ok) {
+        return { ok: false, code: "AON_UNAVAILABLE", message: "Offers are unavailable right now." };
+      }
+      const data = payload && payload.data;
+      const offers = data && Array.isArray(data.offers)
+        ? data.offers.map(normalizeAonOffer).filter(Boolean)
+        : [];
+      return {
+        ok: true,
+        isTest: Boolean(data && data.extra && data.extra.is_test),
+        requestId: data && typeof data.request_id === "string" ? data.request_id : "",
+        offers
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        code: error && error.name === "AbortError" ? "AON_TIMEOUT" : "AON_UNAVAILABLE",
+        message: "Offers are unavailable right now. Your AquaTrace tracking still works."
+      };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   async function n() {
     let r = (await chrome.storage.local.get("waterTrackerState")).waterTrackerState || { bySite: {}, history: [] };
     r.bySite || (r.bySite = {});
@@ -113,6 +229,11 @@
   }
 
   chrome.runtime.onMessage.addListener((e, r, t) => {
+    if (e.type === "AON_QUERY_OFFERS") {
+      queryAonOffers(e.intent).then(t);
+      return true;
+    }
+
     if (e.type === "PROMPT_SENT")
       return enqueueOperation(async () => {
         let o = await n(),
