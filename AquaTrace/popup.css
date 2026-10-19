@@ -145,6 +145,268 @@ body {
   line-height: 1.4;
 }
 
+/* AON product offers */
+.aon-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow-sm);
+}
+
+.aon-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.aon-card-header .section-title {
+  margin-bottom: 3px;
+}
+
+.aon-subtitle,
+.aon-disclosure,
+.aon-consent,
+.aon-empty,
+.aon-status {
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
+.aon-product-context {
+  margin-bottom: 10px;
+}
+
+.aon-product-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 9px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  background: var(--bg-main);
+}
+
+.aon-product-preview > div {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+}
+
+.aon-product-preview dt {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.aon-product-preview dd {
+  min-width: 0;
+  color: var(--text-main);
+  font-size: 11px;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aon-badge {
+  flex-shrink: 0;
+  padding: 4px 7px;
+  border-radius: 12px;
+  background: var(--badge-bg);
+  color: var(--accent-blue-text);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.aon-form {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.aon-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.aon-label {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.aon-optional {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.aon-input,
+.aon-select {
+  width: 100%;
+  min-height: 34px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-main);
+  color: var(--text-main);
+  font-size: 12px;
+}
+
+.aon-select {
+  cursor: pointer;
+}
+
+.aon-input::placeholder {
+  color: var(--text-muted);
+}
+
+.aon-input:focus-visible,
+.aon-select:focus-visible,
+.aon-search-btn:focus-visible,
+.aon-offer-link:focus-visible {
+  outline: 2px solid var(--accent-blue-text);
+  outline-offset: 2px;
+}
+
+.aon-consent {
+  margin-top: 1px;
+}
+
+.aon-search-btn {
+  width: 100%;
+  min-height: 36px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 20px;
+  background: var(--primary-blue);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s, opacity 0.15s;
+}
+
+.aon-search-btn:hover {
+  background: var(--primary-blue-hover);
+}
+
+.aon-search-btn:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.aon-results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.aon-empty,
+.aon-status {
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: var(--banner-bg);
+}
+
+.aon-offer {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 9px;
+  padding: 9px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-main);
+}
+
+.aon-offer-image,
+.aon-offer-image-placeholder {
+  width: 42px;
+  height: 42px;
+  border-radius: 7px;
+}
+
+.aon-offer-image {
+  display: block;
+  object-fit: cover;
+  background: var(--badge-bg);
+}
+
+.aon-offer-image-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--badge-bg);
+  color: var(--accent-blue-text);
+  font-size: 18px;
+}
+
+.aon-offer-body {
+  min-width: 0;
+}
+
+.aon-offer-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+
+.aon-offer-sponsored {
+  color: var(--text-muted);
+  font-size: 9.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.aon-offer-price {
+  color: var(--text-main);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.aon-offer-title {
+  display: block;
+  color: var(--text-main);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  margin-bottom: 3px;
+}
+
+.aon-offer-description {
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  line-height: 1.35;
+  margin-bottom: 5px;
+}
+
+.aon-offer-link {
+  color: var(--accent-blue-text);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.aon-offer-link:hover {
+  text-decoration: underline;
+}
+
+.aon-disclosure {
+  margin-top: 10px;
+  color: var(--text-muted);
+}
+
 /* Site Switcher */
 .site-switcher-container {
   margin-bottom: 12px;

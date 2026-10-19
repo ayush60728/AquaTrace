@@ -179,6 +179,37 @@
     });
   }
 
+  function isShoppingHost(hostname) {
+    const host = String(hostname || "").toLowerCase().replace(/\.$/, "");
+    return host === "amazon.in" || host.endsWith(".amazon.in")
+      || host === "amazon.com" || host.endsWith(".amazon.com")
+      || host === "www.flipkart.com";
+  }
+
+  function getActiveProductContext() {
+    return getActiveTabDetails().then(tab => {
+      if (!tab || !tab.id) return null;
+      let hostname = "";
+      try {
+        hostname = tab.url ? new URL(tab.url).hostname : "";
+      } catch { }
+      if (!isShoppingHost(hostname) || !chrome.tabs.sendMessage) return null;
+      return new Promise(resolve => {
+        try {
+          chrome.tabs.sendMessage(tab.id, { type: "GET_PRODUCT_DATA" }, response => {
+            if (chrome.runtime && chrome.runtime.lastError) {
+              resolve(null);
+              return;
+            }
+            resolve(response || null);
+          });
+        } catch {
+          resolve(null);
+        }
+      });
+    });
+  }
+
   function A(t) {
     let e = t / 500;
     return e < .001 ? "\u2248 0.1% of a 500 mL water bottle" : e < 1 ? `\u2248 ${(e * 100).toFixed(1)}% of a 500 mL water bottle` : `\u2248 ${e.toFixed(1)} water bottles (500 mL)`
@@ -196,6 +227,170 @@
       "'": "&#39;",
       '"': "&quot;"
     }[character]));
+  }
+
+  function safeHttpsUrl(value) {
+    if (typeof value !== "string" || !value.trim()) return "";
+    try {
+      const url = new URL(value);
+      return url.protocol === "https:" && !url.username && !url.password ? value : "";
+    } catch {
+      return "";
+    }
+  }
+
+  function truncateOfferDescription(value, maxLength = 140) {
+    const description = String(value ?? "").trim();
+    if (description.length <= maxLength) return description;
+    return `${description.slice(0, maxLength - 3).trimEnd()}...`;
+  }
+
+  function formatAonPrice(price, currency) {
+    const amount = String(price ?? "").trim();
+    const currencyCode = String(currency ?? "").trim().toUpperCase();
+    if (!amount) return "Price unavailable";
+    const numericAmount = Number(amount);
+    if (currencyCode && Number.isFinite(numericAmount)) {
+      try {
+        return new Intl.NumberFormat(undefined, {
+          style: "currency",
+          currency: currencyCode
+        }).format(numericAmount);
+      } catch { }
+    }
+    return currencyCode ? `${currencyCode} ${amount}` : amount;
+  }
+
+  function getOfferImageUrl(offer) {
+    const image = offer && (offer.imageUrl || offer.image_url || offer.imageURL || offer.image);
+    if (typeof image === "string") return safeHttpsUrl(image);
+    if (image && typeof image.url === "string") return safeHttpsUrl(image.url);
+    return "";
+  }
+
+  function renderAonOffers(response) {
+    const results = document.getElementById("aonOfferResults");
+    if (!results) return;
+    const offers = response && response.ok && Array.isArray(response.offers)
+      ? response.offers.filter(offer => offer && String(offer.title || "").trim() && safeHttpsUrl(offer.actionUrl)).slice(0, 3)
+      : [];
+    if (!response || !response.ok) {
+      results.innerHTML = '<p class="aon-status">Product matches are unavailable right now. Local tracking still works.</p>';
+      return;
+    }
+    if (!offers.length) {
+      results.innerHTML = '<p class="aon-status">No relevant sponsored products are available right now.</p>';
+      return;
+    }
+    results.innerHTML = offers.map(offer => {
+      const title = String(offer.title).trim();
+      const description = truncateOfferDescription(offer.description);
+      const actionUrl = safeHttpsUrl(offer.actionUrl);
+      const imageUrl = getOfferImageUrl(offer);
+      const imageMarkup = imageUrl
+        ? `<img class="aon-offer-image" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(offer.imageAlt || title)}" referrerpolicy="no-referrer" />`
+        : '<div class="aon-offer-image-placeholder" aria-hidden="true">💧</div>';
+      return `<article class="aon-offer">
+        ${imageMarkup}
+        <div class="aon-offer-body">
+          <div class="aon-offer-meta">
+            <span class="aon-offer-sponsored">Sponsored · ${escapeHtml(offer.entityName || "AON")}</span>
+            <span class="aon-offer-price">${escapeHtml(formatAonPrice(offer.price, offer.currency))}</span>
+          </div>
+          <a class="aon-offer-link aon-offer-title" href="${escapeHtml(actionUrl)}" target="_blank" rel="noopener noreferrer sponsored" referrerpolicy="no-referrer">${escapeHtml(title)}</a>
+          ${description ? `<p class="aon-offer-description">${escapeHtml(description)}</p>` : ""}
+          <a class="aon-offer-link" href="${escapeHtml(actionUrl)}" target="_blank" rel="noopener noreferrer sponsored" referrerpolicy="no-referrer">${escapeHtml(offer.actionName || "View product")}</a>
+        </div>
+      </article>`;
+    }).join("");
+  }
+
+  function normalizeProductText(value, limit) {
+    if (typeof value !== "string" && typeof value !== "number") return "";
+    return String(value).replace(/[\u0000-\u001f\u007f-\u009f]/g, " ").replace(/\s+/g, " ").trim().slice(0, limit).trim();
+  }
+
+  function normalizeProductContext(product) {
+    if (!product || typeof product !== "object") return null;
+    const title = normalizeProductText(product.title, 200);
+    if (!title) return null;
+    const category = normalizeProductText(product.category, 120);
+    const rawPrice = normalizeProductText(product.price, 32).replace(/,/g, "");
+    const price = /^\d+(?:\.\d{1,2})?$/.test(rawPrice) ? rawPrice : "";
+    const rawCurrency = normalizeProductText(product.currency, 3).toUpperCase();
+    const currency = /^[A-Z]{3}$/.test(rawCurrency) ? rawCurrency : "";
+    return { title, category, price, currency };
+  }
+
+  function formatProductPreviewPrice(product) {
+    if (!product || !product.price) return "Price not available";
+    if (product.currency) {
+      try {
+        return new Intl.NumberFormat(undefined, {
+          style: "currency",
+          currency: product.currency
+        }).format(Number(product.price));
+      } catch { }
+    }
+    return product.currency ? `${product.currency} ${product.price}` : product.price;
+  }
+
+  function setupAonOfferForm() {
+    const form = document.getElementById("aonOfferForm");
+    const button = document.getElementById("aonSearchBtn");
+    const results = document.getElementById("aonOfferResults");
+    const status = document.getElementById("aonProductStatus");
+    const preview = document.getElementById("aonProductPreview");
+    const titleElement = document.getElementById("aonProductTitle");
+    const categoryElement = document.getElementById("aonProductCategory");
+    const priceElement = document.getElementById("aonProductPrice");
+    if (!form || !button || !results || !status || !preview || !titleElement || !categoryElement || !priceElement) return;
+
+    let productContext = null;
+
+    const showProductContext = product => {
+      productContext = normalizeProductContext(product);
+      if (!productContext) {
+        preview.hidden = true;
+        button.disabled = true;
+        status.textContent = "Open an Amazon or Flipkart product page to enable product matches.";
+        return;
+      }
+      titleElement.textContent = productContext.title;
+      categoryElement.textContent = productContext.category || "Not available";
+      priceElement.textContent = formatProductPreviewPrice(productContext);
+      preview.hidden = false;
+      button.disabled = false;
+      status.textContent = "Product data stays in your browser until you choose to search.";
+    };
+
+    getActiveProductContext().then(showProductContext).catch(() => showProductContext(null));
+
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      if (!productContext) {
+        results.innerHTML = '<p class="aon-status">No product data is available to send.</p>';
+        return;
+      }
+      button.disabled = true;
+      results.innerHTML = '<p class="aon-status" role="status">Finding relevant products using only the product fields above...</p>';
+      try {
+        const response = await chrome.runtime.sendMessage({
+          type: "AON_QUERY_PRODUCT",
+          product: {
+            title: productContext.title,
+            category: productContext.category,
+            price: productContext.price,
+            currency: productContext.currency
+          }
+        });
+        renderAonOffers(response);
+      } catch {
+        results.innerHTML = "<p class=\"aon-status\">We couldn't load product matches right now. Local tracking still works.</p>";
+      } finally {
+        button.disabled = !productContext;
+      }
+    });
   }
 
   function formatCompactNumber(value) {
@@ -624,6 +819,7 @@
           }))
       })
   });
+  setupAonOfferForm();
   c();
 })();
 // Added for contact button

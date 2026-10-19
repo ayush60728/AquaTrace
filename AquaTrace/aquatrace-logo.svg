@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">AquaTrace logo</title>
+  <desc id="desc">A turquoise water drop containing a white data trace on a deep blue background.</desc>
+  <defs>
+    <linearGradient id="background" x1="12" y1="8" x2="116" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#071B35"/>
+      <stop offset="0.58" stop-color="#0A3558"/>
+      <stop offset="1" stop-color="#087C83"/>
+    </linearGradient>
+    <linearGradient id="drop" x1="39" y1="28" x2="85" y2="108" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#B8FFF0"/>
+      <stop offset="0.38" stop-color="#5BE5D7"/>
+      <stop offset="1" stop-color="#16AFC7"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="0" cy="0" r="1" gradientTransform="translate(90 28) rotate(133) scale(70 70)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#63F5E6" stop-opacity="0.3"/>
+      <stop offset="1" stop-color="#63F5E6" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="dropShadow" x="18" y="8" width="92" height="116" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="5" stdDeviation="4" flood-color="#001326" flood-opacity="0.38"/>
+    </filter>
+  </defs>
+
+  <rect width="128" height="128" rx="30" fill="url(#background)"/>
+  <circle cx="90" cy="28" r="58" fill="url(#halo)"/>
+  <path d="M64 14C64 14 27 56.5 27 78.5C27 98.5 43.6 113 64 113C84.4 113 101 98.5 101 78.5C101 56.5 64 14 64 14Z" fill="url(#drop)" stroke="#D8FFF8" stroke-width="3" filter="url(#dropShadow)"/>
+  <ellipse cx="49" cy="47" rx="8" ry="13" transform="rotate(-29 49 47)" fill="#FFFFFF" fill-opacity="0.52"/>
+  <path d="M34 75C42 67 48 84 57 76C66 68 72 65 80 74C87 82 92 79 96 70" stroke="#062640" stroke-opacity="0.22" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M34 75C42 67 48 84 57 76C66 68 72 65 80 74C87 82 92 79 96 70" stroke="#F7FFFE" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="96" cy="70" r="4.2" fill="#FFD166" stroke="#FFF4C7" stroke-width="2"/>
+</svg>

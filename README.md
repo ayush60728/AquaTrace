@@ -35,7 +35,7 @@ graph LR
 
     %% ── Flows ────────────────────────────────────────────
     CS -->|"PROMPT_SENT\n(tokens, detected model)"| BG
-    UI -->|"SET_MODEL / RESET_SITE /\nRESET_ALL / USE_AUTO_DETECT"| BG
+     UI -->|"SET_MODEL / RESET_SITE /\nRESET_ALL / USE_AUTO_DETECT / AON_QUERY_PRODUCT"| BG
     UI -->|"tabs.query (activeTab)"| TAB
     UI -->|"read state"| STORE
 ```
@@ -46,9 +46,11 @@ graph LR
 
 | **`dist/content.bundle.js`** (content script) | Injected into supported AI chat pages only. Detects when a prompt is submitted and when a response finishes streaming, counts tokens for both using the bundled tokenizer, scans the page for the currently selected model name, and sends the result to the background script. Never sends the actual conversation text anywhere only token counts. |
 | **`dist/background.bundle.js`** (service worker) | The only long lived piece. Owns all persisted state in `chrome.storage.local`, keyed per site. Applies auto detected models unless the user has manually overridden that site's choice. Handles reset requests. |
-| **`dist/popup.bundle.js`** (popup UI) | Runs only while the popup is open. Determines which site's card to show by querying the active tab, reads state from storage, and renders it. Sends messages to the background script for any state changes (model picks, resets) rather than writing storage directly. |
+ | **`dist/popup.bundle.js`** (popup UI) | Runs only while the popup is open. Determines which site's card to show by querying the active tab, reads state from storage, and renders it. Sends messages to the background script for any state changes (model picks, resets) rather than writing storage directly. It also requests a local product snapshot and sends an AON query only after an explicit user click. |
+ | **`product-context.js`** (shopping content script) | Runs only on supported Amazon and Flipkart pages. It extracts only product title, category, price, and currency locally in response to `GET_PRODUCT_DATA`; it never makes network requests or sends data automatically. |
 | **Model profile constants** (bundled) | The current repository commits generated bundles rather than a shared source module, so profile values and detection rules are duplicated across the background, popup, and content bundles. Keep them synchronized or add a reproducible build source before changing model data. |
 | **`chrome.storage.local`** | The only persistence layer. Never synced, never transmitted local to the browser profile. |
+ | **AON Offer Query** | After explicit opt-in, the background allowlists only product title, category, price, and currency and sends those fields as the AON intent. It sends no product URL, seller, page text, cookies, account data, AI text, token history, or tab metadata. Returned sponsored destinations are displayed exactly as HTTPS links; a timeout or invalid response does not affect tracking. |
 
 ## Why this shape
 
@@ -80,7 +82,8 @@ AquaTrace is a browser extension that estimates the water, energy, and CO₂ foo
 - **Real-time Token Tracking**: Counts tokens as you chat using GPT tokenizer
 - **Multi-Platform Support**: Works with ChatGPT, Claude AI, Gemini, and DeepSeek
 - **Independent Site Tracking**: Each AI service tracked separately with its own counters
-- **Privacy-First**: All calculations happen locally - no data ever leaves your browser
+- **Privacy-First Tracking**: Footprint calculations and conversation history stay local; optional product searches are separate and require a user click
+- **Shopping product matches**: On supported Amazon or Flipkart product pages, request up to three clearly labeled sponsored AON offers using only an allowlisted product snapshot
 - **Company-Specific Estimates**: Uses accurate WUE (Water Usage Effectiveness) and carbon intensity data for each hosting provider
 
 ### New in Version 1.1.0 ✨
@@ -163,12 +166,18 @@ Perfect for:
 
 ## 🔒 Privacy
 
-**100% Local Processing:**
-- No network requests
-- No data collection
-- No third-party services
-- No conversation text transmitted
-- Aggregate totals and up to 100 local conversation summaries stored only in browser's local storage
+**Local footprint tracking:**
+- No AI conversation text is transmitted by AquaTrace
+- Footprint calculations, aggregate totals, and up to 100 local conversation summaries stay in browser storage
+- No analytics or background advertising requests are made
+
+**Optional product offers:**
+- The shopping content script reads only product title, category, displayed price, and currency locally; it does not send them automatically
+- Only after the user clicks **Find relevant products**, AquaTrace sends those four product fields to AON's Offer Query endpoint
+- The request does not include the product URL, seller, page text, cookies, account data, AI conversation text, local history, token counts, or tab metadata
+- As with any HTTPS request, normal connection metadata such as an IP address may be visible to AON; AquaTrace does not add a user ID, cookie, or account identifier
+- Results are clearly labeled sponsored offers; AquaTrace may earn a commission when a user chooses one
+- If the request fails or times out, no offer data is shown and local tracking continues
 
 Clear your data anytime by clicking "Reset All Sites" or uninstalling the extension.
 
@@ -203,6 +212,7 @@ All estimates are based on:
 ├── manifest.json          # Extension configuration
 ├── popup.html            # Popup UI
 ├── popup.css             # Styling
+├── product-context.js    # Local Amazon/Flipkart product-field extractor
 ├── methodology.html      # Documentation
 ├── dist/
 │   ├── background.bundle.js   # Service worker

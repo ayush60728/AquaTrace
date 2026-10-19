@@ -22,9 +22,9 @@
 
   <h2>Summary</h2>
   <p>
-    This extension does not collect, transmit, sell, or share any user data
-    with anyone, including the developer. Everything it does happens locally
-    in your browser.
+    AquaTrace keeps footprint tracking local. An optional shopping-product
+    search is separate and only sends a small allowlisted product snapshot after you click
+    <strong>Find relevant products</strong>.
   </p>
 
   <h2>What the extension does</h2>
@@ -45,9 +45,9 @@
     (<code>chrome.storage.local</code>). This data:
   </p>
   <ul>
-    <li>Never leaves your device</li>
-    <li>Is never sent to any server, including any server operated by the developer</li>
-    <li>Is not shared with any third party</li>
+    <li>Never leaves your device for footprint tracking</li>
+    <li>Is not sent to the developer or used for analytics</li>
+    <li>The local tracking data is not shared with any third party</li>
     <li>Does not include the actual text of your conversations -- only token counts</li>
     <li>Persists only until you click "Reset" in the extension, or uninstall it</li>
   </ul>
@@ -56,13 +56,23 @@
   <ul>
     <li><strong>storage</strong> -- to save your running token counts locally, so they persist between browser sessions.</li>
     <li><strong>activeTab</strong> -- to detect which supported AI site your current tab is on, only at the moment you open the extension's popup.</li>
-    <li><strong>Host access to chatgpt.com, chat.openai.com, claude.ai, gemini.google.com, and chat.deepseek.com</strong> -- to read prompt/response text on those specific pages in order to count tokens. No other websites are accessed.</li>
+    <li><strong>Host access to chatgpt.com, chat.openai.com, claude.ai, gemini.google.com, and chat.deepseek.com</strong> -- to read prompt/response text on those specific pages in order to count tokens. No other pages are read for tracking.</li>
+    <li><strong>Host access to Amazon and Flipkart product pages</strong> -- to read only the product title, category, displayed price, and currency locally when the popup requests a preview. The content script does not send data automatically.</li>
+    <li><strong>Host access to api.aon.pro</strong> -- to request optional sponsored product matches after you submit the product search.</li>
   </ul>
 
   <h2>Third parties</h2>
   <p>
-    This extension does not use any analytics, tracking, or advertising
-    services. It makes no network requests of its own.
+    AquaTrace does not use analytics. If you opt in by clicking the product
+    search button, only the displayed product title, category, price, and
+    currency are sent to AON (Agent Offer Network) to return sponsored
+    matches. The product URL, seller, page text, cookies, account data, AI
+    chat text, token counts, local history, and tab metadata are not included.
+    Normal HTTPS connection metadata, such as an IP address, may still be
+    visible to AON; AquaTrace does not add a user ID, cookie, or account
+    identifier.
+    Offer links are provided by AON, and AquaTrace may earn a commission if
+    you choose one.
   </p>
 
   <h2>Changes to this policy</h2>

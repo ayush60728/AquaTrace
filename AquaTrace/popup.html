@@ -40,25 +40,29 @@
 
   <p class="subtitle">Estimate the environmental footprint of your AI conversations.</p>
 
-    <!-- AON AI Assistant offer search. This is user initiated; no chat text is read automatically. -->
+    <!-- AON product search. This is user initiated; only an allowlisted product snapshot is sent. -->
     <section class="aon-card" aria-labelledby="aonOfferTitle">
       <div class="aon-card-header">
         <div>
-          <h2 id="aonOfferTitle" class="section-title">Offers for your intent</h2>
+          <h2 id="aonOfferTitle" class="section-title">Product matches</h2>
           <p class="aon-subtitle">Optional sponsored matches from AON</p>
         </div>
         <span class="aon-badge">AON</span>
       </div>
-      <form id="aonOfferForm" class="aon-form">
-        <label class="aon-label" for="aonIntentInput">What are you looking for?</label>
-        <div class="aon-input-row">
-          <input id="aonIntentInput" class="aon-input" type="text" maxlength="200"
-            placeholder="e.g. productivity tools" autocomplete="off" />
-          <button id="aonSearchBtn" class="aon-search-btn" type="submit">Find</button>
-        </div>
+      <div id="aonProductContext" class="aon-product-context" aria-live="polite">
+        <p id="aonProductStatus" class="aon-status">Checking the active shopping page...</p>
+        <dl id="aonProductPreview" class="aon-product-preview" hidden>
+          <div><dt>Product</dt><dd id="aonProductTitle"></dd></div>
+          <div><dt>Category</dt><dd id="aonProductCategory"></dd></div>
+          <div><dt>Price</dt><dd id="aonProductPrice"></dd></div>
+        </dl>
+      </div>
+      <form id="aonOfferForm" class="aon-form" novalidate>
+        <p class="aon-consent">After you click below, AquaTrace sends AON only the displayed product title, category, price, and currency. It does not send the page URL, page text, seller, account data, cookies, AI chats, or local history. Normal HTTPS connection metadata may still be visible to the service.</p>
+        <button id="aonSearchBtn" class="aon-search-btn" type="submit" disabled>Find relevant products</button>
       </form>
       <div id="aonOfferResults" class="aon-results" aria-live="polite">
-        <p class="aon-empty">Enter an intent to see matching offers.</p>
+        <p class="aon-empty">Open an Amazon or Flipkart product page to see optional matches.</p>
       </div>
       <p class="aon-disclosure">Offers are provided by AON. AquaTrace may earn a commission if you choose one.</p>
     </section>
@@ -83,7 +87,7 @@
           <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
           <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
         </svg>
-        <span>Token calculations stay local. Offer searches send only the intent you enter.</span>
+        <span>Token calculations stay local. Offer searches send only an allowlisted product snapshot after you click.</span>
       </div>
       <div class="footer-links">
         <a href="#" id="footerMethodologyLink" class="footer-link">Methodology</a>

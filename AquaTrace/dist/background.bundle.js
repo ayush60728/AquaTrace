@@ -85,10 +85,41 @@
     };
   }
 
+  function cleanAonProductValue(value, limit) {
+    if (typeof value !== "string" && typeof value !== "number") return "";
+    return String(value)
+      .replace(/https?:\/\/\S+/gi, "")
+      .replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, limit)
+      .trim();
+  }
+
+  function normalizeAonProduct(product) {
+    if (!product || typeof product !== "object") return null;
+    const title = cleanAonProductValue(product.title, 200);
+    if (!title) return null;
+    const category = cleanAonProductValue(product.category, 120);
+    const rawCurrency = cleanAonProductValue(product.currency, 3).toUpperCase();
+    const currency = /^[A-Z]{3}$/.test(rawCurrency) ? rawCurrency : "";
+    const rawPrice = cleanAonProductValue(product.price, 32).replace(/,/g, "");
+    const price = currency && /^\d+(?:\.\d{1,2})?$/.test(rawPrice) ? rawPrice : "";
+    return { title, category, price, currency };
+  }
+
+  function productToAonIntent(product) {
+    const fields = [`Product title: ${product.title}`];
+    if (product.category) fields.push(`Category: ${product.category}`);
+    if (product.price && product.currency) fields.push(`Price: ${product.price} ${product.currency}`);
+    return fields.join("; ");
+  }
+
   function safeOfferUrl(value) {
+    const rawUrl = typeof value === "string" ? value : "";
     try {
-      const url = new URL(String(value || ""));
-      return url.protocol === "https:" && !url.username && !url.password ? url.href : "";
+      const url = new URL(rawUrl);
+      return url.protocol === "https:" && !url.username && !url.password ? rawUrl : "";
     } catch {
       return "";
     }
@@ -99,6 +130,10 @@
     const action = offer && offer.action;
     const commercial = info && info.commercial;
     const displayPrice = commercial && (commercial.display_price || commercial.price);
+    const material = Array.isArray(offer && offer.material) ? offer.material : [];
+    const imageMaterial = material.find(asset => asset && asset.format === "image" && safeOfferUrl(asset.url));
+    const listingSource = offer && offer.listing_source;
+    const entity = offer && offer.entity;
     if (!offer || !info || !action || !action.payload || !info.title) return null;
     const actionUrl = safeOfferUrl(action.payload.url);
     if (!actionUrl) return null;
@@ -107,9 +142,13 @@
       offerInstanceId: typeof offer.offer_instance_id === "string" ? offer.offer_instance_id : "",
       title: String(info.title),
       description: String(info.short_description || info.description || ""),
-      entityName: offer.entity && typeof offer.entity.name === "string" ? offer.entity.name : "",
+      entityName: listingSource && typeof listingSource.name === "string" && listingSource.name
+        ? listingSource.name
+        : entity && typeof entity.name === "string" ? entity.name : "",
       price: displayPrice && displayPrice.amount ? String(displayPrice.amount) : "",
       currency: displayPrice && displayPrice.currency ? String(displayPrice.currency) : "",
+      imageUrl: imageMaterial ? safeOfferUrl(imageMaterial.url) : "",
+      imageAlt: imageMaterial && typeof imageMaterial.alt_text === "string" ? imageMaterial.alt_text : "",
       actionUrl,
       actionName: action.name ? String(action.name) : "Learn more",
       matchReason: offer.match_reason ? String(offer.match_reason) : "",
@@ -145,9 +184,9 @@
         content: [{ type: "input_text", text: intent }],
         provenance: "user_expressed"
       },
-      context: {
-        platform: { name: "AquaTrace", channel: "browser_extension" }
-      }
+      // Keep context empty: no platform, tab, session, history, or user data
+      // is sent in addition to the allowlisted product intent above.
+      context: {}
     };
 
     try {
@@ -157,15 +196,34 @@
         body: JSON.stringify(requestBody),
         signal: controller.signal
       });
+      let traceId = "";
+      try {
+        traceId = response.headers && typeof response.headers.get === "function"
+          ? String(response.headers.get("x-aon-trace-id") || "").trim()
+          : "";
+      } catch { traceId = ""; }
+      if (traceId) {
+        try {
+          if (typeof console !== "undefined" && typeof console.info === "function") {
+            console.info("[AON] x-aon-trace-id:", traceId);
+          }
+        } catch { /* tracing must not affect the offer response */ }
+      }
+
       let payload = null;
       try { payload = await response.json(); } catch { payload = null; }
-      if (!response.ok) {
+      const status = Number(response.status);
+      if (!Number.isInteger(status) || status < 200 || status > 299) {
         return { ok: false, code: "AON_UNAVAILABLE", message: "Offers are unavailable right now." };
       }
+      if (!payload || payload.code !== "SUCCESS") {
+        return { ok: false, code: "AON_INVALID_RESPONSE", message: "Offers are unavailable right now." };
+      }
       const data = payload && payload.data;
-      const offers = data && Array.isArray(data.offers)
-        ? data.offers.map(normalizeAonOffer).filter(Boolean)
-        : [];
+      if (!data || data.protocol_version !== AON_PROTOCOL_VERSION || !Array.isArray(data.offers)) {
+        return { ok: false, code: "AON_INVALID_RESPONSE", message: "Offers are unavailable right now." };
+      }
+      const offers = data.offers.map(normalizeAonOffer).filter(Boolean);
       return {
         ok: true,
         isTest: Boolean(data && data.extra && data.extra.is_test),
@@ -178,9 +236,17 @@
         code: error && error.name === "AbortError" ? "AON_TIMEOUT" : "AON_UNAVAILABLE",
         message: "Offers are unavailable right now. Your AquaTrace tracking still works."
       };
-    } finally {
-      clearTimeout(timeout);
+      } finally {
+        clearTimeout(timeout);
+      }
+  }
+
+  async function queryAonProductOffers(product) {
+    const normalizedProduct = normalizeAonProduct(product);
+    if (!normalizedProduct) {
+      return { ok: false, code: "INVALID_PRODUCT", message: "No safe product data is available." };
     }
+    return queryAonOffers(productToAonIntent(normalizedProduct));
   }
 
   async function n() {
@@ -229,8 +295,8 @@
   }
 
   chrome.runtime.onMessage.addListener((e, r, t) => {
-    if (e.type === "AON_QUERY_OFFERS") {
-      queryAonOffers(e.intent).then(t);
+    if (e.type === "AON_QUERY_PRODUCT") {
+      queryAonProductOffers(e.product).then(t);
       return true;
     }
 

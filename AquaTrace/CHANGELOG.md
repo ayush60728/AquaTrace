@@ -2,6 +2,17 @@
 
 All notable changes to AquaTrace will be documented in this file.
 
+## Unreleased
+### Added
+- Shopping product context for optional, user-initiated AON product matches on Amazon and Flipkart.
+- Up to three clearly labeled sponsored offer cards with HTTPS tracking links,
+  source labels, prices, descriptions, and optional product images.
+
+### Privacy
+- Offer searches send only product title, category, displayed price, and currency
+  after explicit user action. URLs, seller/account data, page text, cookies, AI
+  conversation data, and local history are excluded.
+
 ## [1.2.0] - 2026-10-18
 ### Added
 - Site-specific assistant-response adapters for supported AI sites.
