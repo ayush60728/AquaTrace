@@ -46,15 +46,17 @@ graph LR
 
 | **`dist/content.bundle.js`** (content script) | Injected into supported AI chat pages only. Detects when a prompt is submitted and when a response finishes streaming, counts tokens for both using the bundled tokenizer, scans the page for the currently selected model name, and sends the result to the background script. Never sends the actual conversation text anywhere only token counts. |
 | **`dist/background.bundle.js`** (service worker) | The only long lived piece. Owns all persisted state in `chrome.storage.local`, keyed per site. Applies auto detected models unless the user has manually overridden that site's choice. Handles reset requests. |
- | **`dist/popup.bundle.js`** (popup UI) | Runs only while the popup is open. Determines which site's card to show by querying the active tab, reads state from storage, and renders it. Sends messages to the background script for any state changes (model picks, resets) rather than writing storage directly. It also requests a local product snapshot and sends an AON query only after an explicit user click. |
- | **`product-context.js`** (shopping content script) | Runs only on supported Amazon and Flipkart pages. It extracts only product title, category, price, and currency locally in response to `GET_PRODUCT_DATA`; it never makes network requests or sends data automatically. |
+| **`dist/popup.bundle.js`** (popup UI) | Runs only while the popup is open. Determines which site's card to show by querying the active tab, reads state from storage, and renders it. Sends messages to the background script for any state changes (model picks, resets) rather than writing storage directly. It also keeps the shopping opt-in toggle synchronized with the in-page offer bar. |
+| **`product-context.js`** (shopping content script) | Runs only on supported Amazon and Flipkart pages. It extracts only product title, category, price, and currency locally in response to `GET_PRODUCT_DATA`; the companion `shopping-offers.js` uses that context for automatic offers only after the one-time opt-in. |
+| **`shopping-offers.js`** (shopping content script) | Injects the collapsible Shadow DOM offer bar, observes SPA navigation and page updates, and requests bounded sponsored offers without reading AI tracking data. |
 | **Model profile constants** (bundled) | The current repository commits generated bundles rather than a shared source module, so profile values and detection rules are duplicated across the background, popup, and content bundles. Keep them synchronized or add a reproducible build source before changing model data. |
-| **`chrome.storage.local`** | The only persistence layer. Never synced, never transmitted local to the browser profile. |
- | **AON Offer Query** | After explicit opt-in, the background allowlists only product title, category, price, and currency and sends those fields as the AON intent. It sends no product URL, seller, page text, cookies, account data, AI text, token history, or tab metadata. Returned sponsored destinations are displayed exactly as HTTPS links; a timeout or invalid response does not affect tracking. |
+| **`chrome.storage.local`** | Local AI totals/history, shopping consent, and the daily AON query counter. No Chrome sync. |
+| **`chrome.storage.session`** | Ten-minute query cache and per-tab dismissal/last non-empty offers; accessible only through the worker, cleared at browser-session end. |
+| **AON Offer Query** | After one-time opt-in, the background allowlists product title, category, price, and currency, with cleaned shopping search keywords or generic text used when product context is missing. It sends no product URL, seller, page text, cookies, account data, AI text, token history, or tab metadata. Returned sponsored destinations are displayed as HTTPS links; a timeout or invalid response does not affect tracking. |
 
 ## Why this shape
 
-- **Content script never talks to storage directly.** It only ever sends a message to the background script, which is the single source of truth for state. This avoids race conditions if multiple tabs on the same site are open at once.
+- **AI tracking updates are serialized in the background.** The tracking content script sends counted tokens to the background worker rather than writing totals itself. The separate shopping script observes its opt-in setting and keeps tab UI state through the session-storage bridge.
 - **Popup never runs in the background.** It only exists while open, so it always re derives "which site am I looking at" fresh from `chrome.tabs.query` rather than trying to stay in sync with a background process.
 - **Single source of truth is still a follow-up.** The generated bundles currently contain duplicated model configuration; changing a model's energy estimate or detection pattern requires updating each affected bundle consistently.
 
@@ -72,7 +74,7 @@ graph LR
 
 # 💧 AquaTrace - AI Environmental Footprint Tracker
 
-**Version 1.2.0**
+**Version 2.0.0**
 
 AquaTrace is a browser extension that estimates the water, energy, and CO₂ footprint of your AI chat conversations across ChatGPT, Claude, Gemini, and DeepSeek.
 
@@ -82,9 +84,17 @@ AquaTrace is a browser extension that estimates the water, energy, and CO₂ foo
 - **Real-time Token Tracking**: Counts tokens as you chat using GPT tokenizer
 - **Multi-Platform Support**: Works with ChatGPT, Claude AI, Gemini, and DeepSeek
 - **Independent Site Tracking**: Each AI service tracked separately with its own counters
-- **Privacy-First Tracking**: Footprint calculations and conversation history stay local; optional product searches are separate and require a user click
-- **Shopping product matches**: On supported Amazon or Flipkart product pages, request up to three clearly labeled sponsored AON offers using only an allowlisted product snapshot
+- **Privacy-First Tracking**: Footprint calculations and conversation history stay local; shopping offers are separate and require a one-time opt-in
+- **Shopping product matches**: After opt-in, Amazon.in, Amazon.com, and Flipkart pages show up to three labeled sponsored offers using a bounded product snapshot, cleaned search keywords, or a generic starter request
 - **Company-Specific Estimates**: Uses accurate WUE (Water Usage Effectiveness) and carbon intensity data for each hosting provider
+
+### Version 2.0.0 updates
+- Reorganized the popup into Shopping and AI Footprints tabs, with Shopping as the default
+- One-time opt-in automatic sponsored offers on supported Amazon and Flipkart pages
+- Collapsible in-page Shadow DOM offer bar with session dismissal and HTTPS action links
+- Product-context priority with cleaned URL-query and generic fallback retries
+- Shows the latest non-empty sponsored suggestions in the popup outside shopping sites
+- Keeps live product, search and starter suggestions on Amazon and Flipkart
 
 ### New in Version 1.1.0 ✨
 - **DeepSeek Support**: Full tracking for DeepSeek V3 and DeepSeek R1 models
@@ -122,6 +132,42 @@ AquaTrace is a browser extension that estimates the water, energy, and CO₂ foo
 4. Enable "Developer mode"
 5. Click "Load unpacked"
 6. Select the extension folder
+
+### Build, test and reload 2.0.0
+
+The checkout does **not** include the original sources/bundler for `dist/*.bundle.js`.
+The existing background and popup bundles were patched carefully; the AI-tracking
+`dist/content.bundle.js` was left unchanged. New shopping and onboarding code is
+plain JavaScript. There is no `npm install`/bundler step to pretend to rerun.
+
+From the `AquaTrace/` extension folder (the one containing `manifest.json`), run:
+
+```sh
+node --test test/*.test.js
+python3 build.py
+```
+
+Node 18+ and Python 3.8+ are required. The release command checks runtime JavaScript
+syntax, manifest references, and regression tests, then creates a deterministic
+`build/AquaTrace-2.0.0.zip` containing only explicitly allowlisted extension files.
+It excludes private attachments, `.opencode`, local configuration, and test fixtures.
+
+1. In `chrome://extensions`, click **Reload** on the existing unpacked AquaTrace,
+   or use **Load unpacked** on this folder (or an extracted copy of the new ZIP).
+   Do not remove your existing installation if you want to keep usage totals.
+2. Refresh any already-open Amazon/Flipkart tabs so the new content scripts load.
+3. The first install/upgrade opens `onboarding.html`. Its single checkbox is off.
+   The automatic-offer consent is stored separately from the AI tracking data.
+   Later extension reloads preserve the choice.
+4. Tick **Show sponsored product suggestions while I shop on Amazon and Flipkart**.
+   Leave the popup closed; available offers now follow home, search and product pages.
+5. Turn the same checkbox off in the popup to remove all offer bars and stop requests.
+   Dismissing the bar instead suppresses it for that tab until the tab is closed.
+
+No live shopping/AON traffic is produced by the tests or build. The automated
+acceptance fixtures use the real extension code with simulated Chrome/DOM/network
+boundaries. They do not replace a real Chrome 114+ smoke test against current site
+markup, live offer inventory, image loading, or actual new-tab clicks.
 
 ## 📖 How It Works
 
@@ -169,17 +215,65 @@ Perfect for:
 **Local footprint tracking:**
 - No AI conversation text is transmitted by AquaTrace
 - Footprint calculations, aggregate totals, and up to 100 local conversation summaries stay in browser storage
-- No analytics or background advertising requests are made
+- No analytics are sent; optional shopping-offer requests begin only after opt-in
 
 **Optional product offers:**
-- The shopping content script reads only product title, category, displayed price, and currency locally; it does not send them automatically
-- Only after the user clicks **Find relevant products**, AquaTrace sends those four product fields to AON's Offer Query endpoint
+- The shopping content scripts read only product title, category, displayed price, and currency locally; they do not send them before opt-in
+- After the user enables automatic matches once, supported shopping pages send those four product fields to AON's Offer Query endpoint without requiring a popup click for each page
+- Without product context, only cleaned Amazon `k` / Flipkart `q` search keywords or the generic text `Show me relevant offers` are sent instead
 - The request does not include the product URL, seller, page text, cookies, account data, AI conversation text, local history, token counts, or tab metadata
 - As with any HTTPS request, normal connection metadata such as an IP address may be visible to AON; AquaTrace does not add a user ID, cookie, or account identifier
-- Results are clearly labeled sponsored offers; AquaTrace may earn a commission when a user chooses one
+- Results are clearly labeled sponsored offers; the offer bar can be collapsed or dismissed for the current tab/session, and AquaTrace may earn a commission when a user chooses one
 - If the request fails or times out, no offer data is shown and local tracking continues
+- Identical queries (including empty results) are cached for ten minutes in extension session storage
+- At most 50 attempts per UTC day per browser profile, including fallbacks and failures; the AON placement's separate network-wide allowance is 1,000 offers/day
+- Opt-out aborts in-flight requests and blocks queued fallbacks; it cannot retract data already transmitted
 
-Clear your data anytime by clicking "Reset All Sites" or uninstalling the extension.
+Reset AI usage from the popup. Shopping consent and the quota are separate from
+AI usage resets; uninstalling clears all extension storage.
+
+### Public configuration and security
+
+The live AON placement identifier in `aon-config.js` is intentionally public
+client configuration. AquaTrace's live requests do **not** contain an API key,
+password, bearer token, account credential, or private signing key. Do not add
+one: anything bundled into a browser extension can be extracted by users.
+
+The public placement ID can be copied by other clients and may be able to
+consume the placement's shared AON quota or create noisy placement statistics.
+It is not a user credential and does not grant access to AquaTrace's local AI
+history. If stronger abuse protection is required, configure restrictions or
+rate limits with AON, or move the AON request behind a server you control; do
+not embed a secret in this repository or extension package.
+
+The extension sends shopping data to AON only after the user enables the
+automatic-suggestions checkbox. It sends only the bounded product fields or
+cleaned search intent described above. See the [privacy policy](./index.html)
+and [methodology](./AquaTrace/methodology.html) for the complete disclosure.
+
+### GitHub publishing hygiene
+
+Private development attachments and release packages are already excluded from
+Git by the root `.gitignore` and `AquaTrace/.gitignore`. The `.opencode/`
+directory contains local development attachments and must not be published. The
+release ZIP is a build output, not a source file, and must not be committed.
+
+The current Web Store package is generated at
+`AquaTrace/build/AquaTrace-2.0.0.zip`; it is ignored and should be uploaded to
+the Web Store separately rather than committed by default.
+
+Before committing, inspect the staged file list and scan for credentials:
+
+```bash
+git status --short
+git diff --cached --stat
+git grep -n -I -E 'Authorization|Bearer |apiKey|API_KEY|password|BEGIN .*PRIVATE KEY|sk-|AIza'
+```
+
+Never commit `.env` files, API keys, access tokens, passwords, private keys,
+certificates, local logs, browser data, or chat/session attachments. If a
+secret has already been pushed, rotate it immediately and remove it from Git
+history; deleting it in a later commit is not sufficient.
 
 ## 🎨 Features
 
@@ -213,10 +307,15 @@ All estimates are based on:
 ├── popup.html            # Popup UI
 ├── popup.css             # Styling
 ├── product-context.js    # Local Amazon/Flipkart product-field extractor
+├── shopping-offers.js    # Opt-in in-page sponsored-offer experience
+├── shopping-history.js   # MAIN-world SPA navigation notification bridge
+├── shopping-session.js   # Worker bridge for tab/session dismissal and offer cache
+├── onboarding.html/js/css # One-time consent page (no remote requests)
+├── build.py              # Offline validation and allowlisted release packaging
 ├── methodology.html      # Documentation
 ├── dist/
 │   ├── background.bundle.js   # Service worker
-│   ├── content.bundle.js      # Content script
+│   ├── content.bundle.js      # AI tracking content script
 │   └── popup.bundle.js        # Popup logic
 └── icons/               # Extension icons
 ```

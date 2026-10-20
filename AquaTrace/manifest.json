@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "AquaTrace",
-  "version": "1.2.0",
-  "description": "Estimate the water, energy & CO2 footprint of ChatGPT, Claude, Gemini & DeepSeek chats. Token calculations stay local; optional offer searches send only selected product fields.",
+  "version": "2.0.0",
+  "description": "Local AI footprint tracking plus optional automatic sponsored offers on Amazon and Flipkart after one-time opt-in.",
   "permissions": [
     "storage",
     "activeTab"
@@ -29,6 +29,18 @@
   "content_scripts": [
     {
       "matches": [
+        "https://*.amazon.in/*",
+        "https://*.amazon.com/*",
+        "https://*.flipkart.com/*"
+      ],
+      "js": [
+        "shopping-history.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
         "https://chatgpt.com/*",
         "https://chat.openai.com/*",
         "https://claude.ai/*",
@@ -44,10 +56,11 @@
       "matches": [
         "https://*.amazon.in/*",
         "https://*.amazon.com/*",
-        "https://www.flipkart.com/*"
+        "https://*.flipkart.com/*"
       ],
       "js": [
-        "product-context.js"
+        "product-context.js",
+        "shopping-offers.js"
       ],
       "run_at": "document_idle"
     }

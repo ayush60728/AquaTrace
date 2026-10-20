@@ -130,7 +130,7 @@
   function isSupportedHost(host) {
     return host === "amazon.in" || host.endsWith(".amazon.in")
       || host === "amazon.com" || host.endsWith(".amazon.com")
-      || host === "www.flipkart.com";
+      || host === "flipkart.com" || host.endsWith(".flipkart.com");
   }
 
   function isAmazonHost(host) {
@@ -139,14 +139,14 @@
   }
 
   function isFlipkartHost(host) {
-    return host === "www.flipkart.com";
+    return host === "flipkart.com" || host.endsWith(".flipkart.com");
   }
 
   function cleanText(value, limit) {
     if (typeof value !== "string" && typeof value !== "number") return "";
 
     const normalized = String(value)
-      .replace(/https?:\/\/\S+/gi, "")
+      .replace(/(?:\b[a-z][a-z\d+.-]*:\/\/|\bwww\.|\/\/)\S+/gi, "")
       .replace(CONTROL_CHARACTERS, " ")
       .replace(/\s+/g, " ")
       .trim();
@@ -398,7 +398,7 @@
   }
 
   function currencyFromHost(host) {
-    if (host === "www.flipkart.com" || host === "flipkart.com"
+    if (host === "www.flipkart.com" || host === "flipkart.com" || host.endsWith(".flipkart.com")
       || host === "amazon.in" || host.endsWith(".amazon.in")) return "INR";
     if (host === "amazon.com" || host.endsWith(".amazon.com")) return "USD";
     return "";
@@ -466,16 +466,13 @@
     ]), LIMITS.title);
   }
 
-  function getCategory(host, product, title) {
-    const jsonCategory = firstText(product && product.category, LIMITS.category);
-    if (jsonCategory) return jsonCategory;
+  function isPlausibleCategory(value) {
+    // Navigation menus and mega-menus often expose long run-together text
+    // through generic attributes; real category names are short.
+    return Boolean(value) && value.length <= 60;
+  }
 
-    const itemCategory = firstItemValue(CATEGORY_SELECTORS, LIMITS.category);
-    if (itemCategory) return itemCategory;
-
-    const metaCategory = cleanText(firstMetaValue(CATEGORY_META_SELECTORS), LIMITS.category);
-    if (metaCategory) return metaCategory;
-
+  function getBreadcrumbCategory(host, title) {
     const selectors = isAmazonHost(host)
       ? BREADCRUMB_SELECTORS.slice(0, 2)
       : isFlipkartHost(host) ? BREADCRUMB_SELECTORS.slice(2) : BREADCRUMB_SELECTORS;
@@ -483,9 +480,25 @@
     for (const selector of selectors) {
       const values = queryAll(selector)
         .map(node => cleanText(readNodeValue(node), LIMITS.category))
-        .filter(value => value && value !== title && !/^(home|all|categories?)$/i.test(value));
+        .filter(value => isPlausibleCategory(value) && value !== title && !/^(home|all|categories?)$/i.test(value));
       if (values.length) return values[values.length - 1];
     }
+    return "";
+  }
+
+  function getCategory(host, product, title) {
+    // The page breadcrumb is the most reliable source on Amazon and Flipkart.
+    const breadcrumbCategory = getBreadcrumbCategory(host, title);
+    if (isPlausibleCategory(breadcrumbCategory)) return breadcrumbCategory;
+
+    const jsonCategory = firstText(product && product.category, LIMITS.category);
+    if (isPlausibleCategory(jsonCategory)) return jsonCategory;
+
+    const itemCategory = firstItemValue(CATEGORY_SELECTORS, LIMITS.category);
+    if (isPlausibleCategory(itemCategory)) return itemCategory;
+
+    const metaCategory = cleanText(firstMetaValue(CATEGORY_META_SELECTORS), LIMITS.category);
+    if (isPlausibleCategory(metaCategory)) return metaCategory;
 
     return "";
   }
@@ -551,6 +564,16 @@
       price: cleanText(price, LIMITS.price),
       currency: cleanText(getCurrency(priceInfo), LIMITS.currency)
     };
+  }
+
+  // The shopping-offers content script runs beside this reusable extractor in
+  // the same extension isolated world. Keeping the extractor here means the
+  // popup and the in-page offer bar share exactly the same product context.
+  if (typeof globalThis !== "undefined") {
+    globalThis.AquaTraceProductContext = Object.freeze({
+      extractProductData,
+      isSupportedHost
+    });
   }
 
   if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage

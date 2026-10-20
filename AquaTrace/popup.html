@@ -38,79 +38,99 @@
       </button>
     </header>
 
-  <p class="subtitle">Estimate the environmental footprint of your AI conversations.</p>
+    <div class="popup-tabs" role="tablist" aria-label="AquaTrace views">
+      <button type="button" id="shoppingTab" class="popup-tab" role="tab" aria-selected="true"
+        aria-controls="shoppingPanel" tabindex="0">Shopping</button>
+      <button type="button" id="aiFootprintsTab" class="popup-tab" role="tab" aria-selected="false"
+        aria-controls="aiFootprintsPanel" tabindex="-1">AI Footprints</button>
+    </div>
 
-    <!-- AON product search. This is user initiated; only an allowlisted product snapshot is sent. -->
-    <section class="aon-card" aria-labelledby="aonOfferTitle">
-      <div class="aon-card-header">
-        <div>
-          <h2 id="aonOfferTitle" class="section-title">Product matches</h2>
-          <p class="aon-subtitle">Optional sponsored matches from AON</p>
+    <section id="shoppingPanel" class="tab-panel" role="tabpanel" aria-labelledby="shoppingTab" aria-hidden="false" tabindex="0">
+      <p class="subtitle">Find relevant sponsored products while you shop.</p>
+
+      <!-- AON product search. Automatic suggestions require a one-time user opt-in. -->
+      <section class="aon-card" aria-labelledby="aonOfferTitle">
+        <div class="aon-card-header">
+          <div>
+            <h2 id="aonOfferTitle" class="section-title">Product matches</h2>
+            <p class="aon-subtitle">Automatic sponsored matches after one-time opt-in</p>
+          </div>
+          <span class="aon-badge">AON</span>
         </div>
-        <span class="aon-badge">AON</span>
-      </div>
       <div id="aonProductContext" class="aon-product-context" aria-live="polite">
-        <p id="aonProductStatus" class="aon-status">Checking the active shopping page...</p>
+        <p id="aonProductStatus" class="aon-status" role="status">Checking the active shopping page...</p>
         <dl id="aonProductPreview" class="aon-product-preview" hidden>
           <div><dt>Product</dt><dd id="aonProductTitle"></dd></div>
           <div><dt>Category</dt><dd id="aonProductCategory"></dd></div>
           <div><dt>Price</dt><dd id="aonProductPrice"></dd></div>
         </dl>
       </div>
-      <form id="aonOfferForm" class="aon-form" novalidate>
-        <p class="aon-consent">After you click below, AquaTrace sends AON only the displayed product title, category, price, and currency. It does not send the page URL, page text, seller, account data, cookies, AI chats, or local history. Normal HTTPS connection metadata may still be visible to the service.</p>
-        <button id="aonSearchBtn" class="aon-search-btn" type="submit" disabled>Find relevant products</button>
-      </form>
       <div id="aonOfferResults" class="aon-results" aria-live="polite">
-        <p class="aon-empty">Open an Amazon or Flipkart product page to see optional matches.</p>
+        <p class="aon-empty">Sponsored suggestions will appear here.</p>
       </div>
+      <form id="aonOfferForm" class="aon-form" novalidate>
+          <label class="aon-auto-toggle" for="aonAutoMatchesToggle">
+            <input id="aonAutoMatchesToggle" type="checkbox" />
+            <span class="aon-auto-toggle-copy">
+              <strong>Show sponsored product suggestions while I shop on Amazon and Flipkart</strong>
+              <small>Show an offer bar on Amazon and Flipkart without opening this popup.</small>
+            </span>
+          </label>
+          <p class="aon-consent">When on, AquaTrace sends AON the product title, category and price of the product page you view, or the search words you type into Amazon/Flipkart search. It never sends the page URL, cookies, account or seller data, page text, AI chats or local history.</p>
+          <p class="aon-consent">Price includes its currency. Other shopping pages use a generic offer request. Nothing is sent until you opt in. Normal HTTPS connection metadata, such as your IP address, may be visible to AON.</p>
+          <button id="aonSearchBtn" class="aon-search-btn" type="submit" disabled>Enable suggestions above</button>
+      </form>
       <p class="aon-disclosure">Offers are provided by AON. AquaTrace may earn a commission if you choose one.</p>
+      </section>
     </section>
 
-    <!-- Site Switcher Dropdown (Shown when multiple sites exist) -->
-    <div id="siteSwitcherContainer" class="site-switcher-container" style="display: none;">
-      <label class="select-label" for="siteSwitcher">Viewing Site</label>
-      <div class="select-wrapper">
-        <select id="siteSwitcher" class="site-select"></select>
+    <section id="aiFootprintsPanel" class="tab-panel" role="tabpanel" aria-labelledby="aiFootprintsTab" aria-hidden="true" tabindex="0" hidden>
+      <p class="subtitle">Track your AI conversation footprint locally.</p>
+      <!-- Site Switcher Dropdown (Shown when multiple sites exist) -->
+      <div id="siteSwitcherContainer" class="site-switcher-container" style="display: none;">
+        <label class="select-label" for="siteSwitcher">Viewing Site</label>
+        <div class="select-wrapper">
+          <select id="siteSwitcher" class="site-select"></select>
+        </div>
       </div>
-    </div>
 
 
-    <!-- Active Site & Impact Stats -->
-    <div id="currentSiteCard"><div style="padding:20px;text-align:center;color:var(--text-muted);font-size:12px;">Loading...</div></div>
-    <div id="historyPanel"><div style="padding:12px;text-align:center;color:var(--text-muted);font-size:12px;">Loading activity...</div></div>
-    <!-- Footer -->
-    <footer class="footer">
-      <div class="footer-privacy">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-        </svg>
-        <span>Token calculations stay local. Offer searches send only an allowlisted product snapshot after you click.</span>
-      </div>
-      <div class="footer-links">
-        <a href="#" id="footerMethodologyLink" class="footer-link">Methodology</a>
-        <a href="https://github.com/ayush60728/AquaTrace/blob/main/index.html" target="_blank" rel="noopener" class="footer-link">Privacy Policy</a>
-      </div>
-      <div class="footer-copyright">
-        AquaTrace &mdash; estimates only, not measurements
-      </div>
-    </footer>
-  </div>
+      <!-- Active Site & Impact Stats -->
+      <div id="currentSiteCard"><div style="padding:20px;text-align:center;color:var(--text-muted);font-size:12px;">Loading...</div></div>
+      <div id="historyPanel"><div style="padding:12px;text-align:center;color:var(--text-muted);font-size:12px;">Loading activity...</div></div>
+      <!-- Footer -->
+      <footer class="footer">
+        <div class="footer-privacy">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+          <span>Token calculations stay local. After one-time opt-in, AquaTrace automatically sends AON only product fields, cleaned shopping keywords, or a generic offer request.</span>
+        </div>
+        <div class="footer-links">
+          <a href="#" id="footerMethodologyLink" class="footer-link">Methodology</a>
+          <a href="https://github.com/ayush60728/AquaTrace/blob/main/index.html" target="_blank" rel="noopener" class="footer-link">Privacy Policy</a>
+        </div>
+        <div class="footer-copyright">
+          AquaTrace &mdash; estimates only, not measurements
+        </div>
+      </footer>
 
-  <div class="bottom-actions">
-    <a href="mailto:ayushkumar44344@gmail.com" id="contactBtn" target="_blank" rel="noopener"
-      class="bottom-action-btn">
-      Contact
-    </a>
-    <button type="button" id="copySummaryBtn" class="bottom-action-btn">
-      Copy Summary
-    </button>
-    <button type="button" id="exportDataBtn"
-      class="bottom-action-btn">
-      Export Data
-    </button>
+      <div class="bottom-actions">
+        <a href="mailto:ayushkumar44344@gmail.com" id="contactBtn" target="_blank" rel="noopener"
+          class="bottom-action-btn">
+          Contact
+        </a>
+        <button type="button" id="copySummaryBtn" class="bottom-action-btn">
+          Copy Summary
+        </button>
+        <button type="button" id="exportDataBtn"
+          class="bottom-action-btn">
+          Export Data
+        </button>
+      </div>
+    </section>
   </div>
 
   <script src="aon-config.js"></script>

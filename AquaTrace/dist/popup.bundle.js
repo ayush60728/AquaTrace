@@ -183,7 +183,62 @@
     const host = String(hostname || "").toLowerCase().replace(/\.$/, "");
     return host === "amazon.in" || host.endsWith(".amazon.in")
       || host === "amazon.com" || host.endsWith(".amazon.com")
-      || host === "www.flipkart.com";
+      || host === "flipkart.com" || host.endsWith(".flipkart.com");
+  }
+
+  const AON_LAST_OFFERS_STORAGE_KEY = "aonLastNonEmptyOffers";
+  const GENERIC_AON_INTENT = "Show me relevant offers";
+
+  function cleanShoppingIntent(value) {
+    if (typeof value !== "string" && typeof value !== "number") return "";
+    return String(value)
+      .replace(/(?:\b[a-z][a-z\d+.-]*:\/\/|\bwww\.|\/\/)\S+/gi, "")
+      .replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 200)
+      .trim();
+  }
+
+  function getActiveShoppingDetails() {
+    return getActiveTabDetails().then(tab => {
+      if (!tab || !tab.url) return { isShopping: false, intent: "" };
+      try {
+        const url = new URL(tab.url);
+        const host = url.hostname.toLowerCase().replace(/\.$/, "");
+        if (!isShoppingHost(host)) return { isShopping: false, intent: "" };
+        const parameter = host === "amazon.in" || host.endsWith(".amazon.in")
+          || host === "amazon.com" || host.endsWith(".amazon.com") ? "k" : "q";
+        return {
+          isShopping: true,
+          intent: cleanShoppingIntent(url.searchParams.get(parameter) || "")
+        };
+      } catch {
+        return { isShopping: false, intent: "" };
+      }
+    });
+  }
+
+  function getLastAonOffers() {
+    return new Promise(resolve => {
+      try {
+        const session = chrome.storage && chrome.storage.session;
+        if (!session || typeof session.get !== "function") {
+          resolve([]);
+          return;
+        }
+        const finish = result => {
+          const entry = result && result[AON_LAST_OFFERS_STORAGE_KEY];
+          resolve(entry && Array.isArray(entry.offers) ? entry.offers.slice(0, 3) : []);
+        };
+        const maybePromise = session.get(AON_LAST_OFFERS_STORAGE_KEY, finish);
+        if (maybePromise && typeof maybePromise.then === "function") {
+          maybePromise.then(finish, () => resolve([]));
+        }
+      } catch {
+        resolve([]);
+      }
+    });
   }
 
   function getActiveProductContext() {
@@ -231,6 +286,7 @@
 
   function safeHttpsUrl(value) {
     if (typeof value !== "string" || !value.trim()) return "";
+    if (!/^https:\/\//i.test(value) || /[\s\u0000-\u001f\u007f-\u009f]/.test(value)) return "";
     try {
       const url = new URL(value);
       return url.protocol === "https:" && !url.username && !url.password ? value : "";
@@ -274,35 +330,79 @@
     const offers = response && response.ok && Array.isArray(response.offers)
       ? response.offers.filter(offer => offer && String(offer.title || "").trim() && safeHttpsUrl(offer.actionUrl)).slice(0, 3)
       : [];
+    const renderMessage = message => {
+      const element = document.createElement("p");
+      element.className = "aon-status";
+      element.textContent = message;
+      results.replaceChildren(element);
+    };
     if (!response || !response.ok) {
-      results.innerHTML = '<p class="aon-status">Product matches are unavailable right now. Local tracking still works.</p>';
+      results.replaceChildren();
       return;
     }
     if (!offers.length) {
-      results.innerHTML = '<p class="aon-status">No relevant sponsored products are available right now.</p>';
+      renderMessage("No relevant sponsored products are available right now.");
       return;
     }
-    results.innerHTML = offers.map(offer => {
+    const fragment = document.createDocumentFragment();
+    offers.forEach(offer => {
       const title = String(offer.title).trim();
       const description = truncateOfferDescription(offer.description);
       const actionUrl = safeHttpsUrl(offer.actionUrl);
       const imageUrl = getOfferImageUrl(offer);
-      const imageMarkup = imageUrl
-        ? `<img class="aon-offer-image" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(offer.imageAlt || title)}" referrerpolicy="no-referrer" />`
-        : '<div class="aon-offer-image-placeholder" aria-hidden="true">💧</div>';
-      return `<article class="aon-offer">
-        ${imageMarkup}
-        <div class="aon-offer-body">
-          <div class="aon-offer-meta">
-            <span class="aon-offer-sponsored">Sponsored · ${escapeHtml(offer.entityName || "AON")}</span>
-            <span class="aon-offer-price">${escapeHtml(formatAonPrice(offer.price, offer.currency))}</span>
-          </div>
-          <a class="aon-offer-link aon-offer-title" href="${escapeHtml(actionUrl)}" target="_blank" rel="noopener noreferrer sponsored" referrerpolicy="no-referrer">${escapeHtml(title)}</a>
-          ${description ? `<p class="aon-offer-description">${escapeHtml(description)}</p>` : ""}
-          <a class="aon-offer-link" href="${escapeHtml(actionUrl)}" target="_blank" rel="noopener noreferrer sponsored" referrerpolicy="no-referrer">${escapeHtml(offer.actionName || "View product")}</a>
-        </div>
-      </article>`;
-    }).join("");
+      const card = document.createElement("a");
+      card.className = "aon-offer";
+      card.href = actionUrl;
+      card.target = "_blank";
+      card.rel = "noopener noreferrer sponsored";
+      card.referrerPolicy = "no-referrer";
+      const image = imageUrl ? document.createElement("img") : document.createElement("div");
+      if (imageUrl) {
+        image.className = "aon-offer-image";
+        image.referrerPolicy = "no-referrer";
+        image.src = imageUrl;
+        image.alt = String(offer.imageAlt || title);
+        image.addEventListener("error", () => {
+          const placeholder = document.createElement("div");
+          placeholder.className = "aon-offer-image-placeholder";
+          placeholder.setAttribute("aria-hidden", "true");
+          placeholder.textContent = "💧";
+          image.replaceWith(placeholder);
+        }, { once: true });
+      } else {
+        image.className = "aon-offer-image-placeholder";
+        image.setAttribute("aria-hidden", "true");
+        image.textContent = "💧";
+      }
+      const body = document.createElement("div");
+      body.className = "aon-offer-body";
+      const meta = document.createElement("div");
+      meta.className = "aon-offer-meta";
+      const sponsored = document.createElement("span");
+      sponsored.className = "aon-offer-sponsored";
+      sponsored.textContent = `Sponsored · ${String(offer.entityName || offer.source || "AON")}`;
+      const price = document.createElement("span");
+      price.className = "aon-offer-price";
+      price.textContent = formatAonPrice(offer.price, offer.currency);
+      meta.append(sponsored, price);
+      const titleLink = document.createElement("span");
+      titleLink.className = "aon-offer-link aon-offer-title";
+      titleLink.textContent = title;
+      body.append(meta, titleLink);
+      if (description) {
+        const descriptionElement = document.createElement("p");
+        descriptionElement.className = "aon-offer-description";
+        descriptionElement.textContent = description;
+        body.appendChild(descriptionElement);
+      }
+      const actionLink = document.createElement("span");
+      actionLink.className = "aon-offer-link";
+      actionLink.textContent = String(offer.actionName || "View deal");
+      body.appendChild(actionLink);
+      card.append(image, body);
+      fragment.appendChild(card);
+    });
+    results.replaceChildren(fragment);
   }
 
   function normalizeProductText(value, limit) {
@@ -338,58 +438,244 @@
   function setupAonOfferForm() {
     const form = document.getElementById("aonOfferForm");
     const button = document.getElementById("aonSearchBtn");
+    const autoToggle = document.getElementById("aonAutoMatchesToggle");
     const results = document.getElementById("aonOfferResults");
     const status = document.getElementById("aonProductStatus");
     const preview = document.getElementById("aonProductPreview");
     const titleElement = document.getElementById("aonProductTitle");
     const categoryElement = document.getElementById("aonProductCategory");
     const priceElement = document.getElementById("aonProductPrice");
-    if (!form || !button || !results || !status || !preview || !titleElement || !categoryElement || !priceElement) return;
+    if (!form || !button || !autoToggle || !results || !status || !preview || !titleElement || !categoryElement || !priceElement) return;
 
+    const AUTO_MATCHES_KEY = "aonAutoMatchesEnabled";
     let productContext = null;
+    let activeShoppingPage = false;
+    let shoppingIntent = "";
+    let autoMatchesEnabled = false;
+    let requestInFlight = false;
+    let requestRevision = 0;
 
-    const showProductContext = product => {
+    const setButtonLabel = label => {
+      const labelElement = button.querySelector("span");
+      if (labelElement) {
+        labelElement.textContent = label;
+      } else {
+        button.textContent = label;
+      }
+    };
+
+    const updateIdleState = () => {
+      if (!autoMatchesEnabled) {
+        button.disabled = true;
+        setButtonLabel("Enable suggestions above");
+        return;
+      }
+      if (!activeShoppingPage) {
+        button.disabled = true;
+        setButtonLabel("Browse Amazon or Flipkart for live suggestions");
+        return;
+      }
+      if (!productContext) {
+        button.disabled = requestInFlight;
+        setButtonLabel("Refresh suggestions");
+        return;
+      }
+      button.disabled = requestInFlight;
+      setButtonLabel(autoMatchesEnabled ? "Refresh suggestions" : "Find relevant products");
+    };
+
+    const requestOffers = async () => {
+      if (!autoMatchesEnabled || !activeShoppingPage || requestInFlight) return;
+      requestInFlight = true;
+      const revision = requestRevision;
+      button.disabled = true;
+      setButtonLabel("Refreshing suggestions");
+      status.textContent = "Finding relevant product suggestions...";
+      const loadingMessage = document.createElement("p");
+      loadingMessage.className = "aon-status";
+      loadingMessage.setAttribute("role", "status");
+      loadingMessage.textContent = "Finding sponsored suggestions...";
+      results.replaceChildren(loadingMessage);
+      try {
+        const response = await chrome.runtime.sendMessage(productContext
+          ? {
+            type: "AON_QUERY_PRODUCT",
+            product: {
+              title: productContext.title,
+              category: productContext.category,
+              price: productContext.price,
+              currency: productContext.currency
+            }
+          }
+          : { type: "AON_QUERY_TEXT", text: shoppingIntent || GENERIC_AON_INTENT });
+        if (revision !== requestRevision) return;
+        if (response && response.ok && Array.isArray(response.offers) && response.offers.length) {
+          renderAonOffers(response);
+          status.textContent = "Live suggestions updated from AON.";
+        } else {
+          const reused = await showLastOffers("Showing your latest sponsored suggestions.", revision);
+          if (!reused) {
+            renderAonOffers({ ok: true, offers: [] });
+            status.textContent = "No sponsored suggestions to show right now.";
+          }
+        }
+      } catch {
+        if (revision !== requestRevision) return;
+        const reused = await showLastOffers("Showing your latest sponsored suggestions.", revision);
+        if (!reused) {
+          results.replaceChildren();
+          status.textContent = "No sponsored suggestions to show right now.";
+        }
+      } finally {
+        requestInFlight = false;
+        updateIdleState();
+        if (revision !== requestRevision && autoMatchesEnabled) requestOffers();
+      }
+    };
+
+    const showLastOffers = async (message, expectedRevision = null) => {
+      const offers = await getLastAonOffers();
+      if (expectedRevision !== null && (expectedRevision !== requestRevision || !autoMatchesEnabled)) return false;
+      if (!offers.length) {
+        results.replaceChildren();
+        return false;
+      }
+      renderAonOffers({ ok: true, offers });
+      status.textContent = message;
+      return true;
+    };
+
+    const showProductContext = (product, shoppingDetails) => {
+      activeShoppingPage = Boolean(shoppingDetails && shoppingDetails.isShopping);
+      shoppingIntent = cleanShoppingIntent(shoppingDetails && shoppingDetails.intent);
       productContext = normalizeProductContext(product);
       if (!productContext) {
         preview.hidden = true;
-        button.disabled = true;
-        status.textContent = "Open an Amazon or Flipkart product page to enable product matches.";
+        updateIdleState();
+        if (autoMatchesEnabled && activeShoppingPage) {
+          status.textContent = "Loading live sponsored suggestions...";
+          requestOffers();
+        } else if (autoMatchesEnabled) {
+          status.textContent = "Showing your latest sponsored suggestions.";
+          showLastOffers("Showing your latest sponsored suggestions.").then(reused => {
+            if (!reused) status.textContent = "No saved sponsored suggestions yet.";
+          });
+        } else {
+          status.textContent = "Suggestions are off until you enable the checkbox.";
+          results.replaceChildren();
+        }
         return;
       }
       titleElement.textContent = productContext.title;
       categoryElement.textContent = productContext.category || "Not available";
       priceElement.textContent = formatProductPreviewPrice(productContext);
       preview.hidden = false;
-      button.disabled = false;
-      status.textContent = "Product data stays in your browser until you choose to search.";
+      if (autoMatchesEnabled) {
+        status.textContent = "Product detected. Loading relevant suggestions automatically...";
+        requestOffers();
+      } else {
+        updateIdleState();
+        status.textContent = "Product detected. Suggestions stay off until you enable the checkbox.";
+      }
     };
 
-    getActiveProductContext().then(showProductContext).catch(() => showProductContext(null));
+    const loadAutoMatchesPreference = async () => {
+      try {
+        const stored = await chrome.storage.local.get(AUTO_MATCHES_KEY);
+        autoMatchesEnabled = stored && stored[AUTO_MATCHES_KEY] === true;
+      } catch { }
+      autoToggle.checked = autoMatchesEnabled;
+      updateIdleState();
+    };
 
-    form.addEventListener("submit", async event => {
-      event.preventDefault();
-      if (!productContext) {
-        results.innerHTML = '<p class="aon-status">No product data is available to send.</p>';
+    autoToggle.addEventListener("change", async () => {
+      const previousValue = autoMatchesEnabled;
+      autoMatchesEnabled = autoToggle.checked;
+      if (!autoMatchesEnabled) {
+        requestRevision += 1;
+        results.replaceChildren();
+      }
+      updateIdleState();
+      try {
+        await chrome.storage.local.set({ [AUTO_MATCHES_KEY]: autoMatchesEnabled });
+      } catch {
+        autoMatchesEnabled = previousValue;
+        autoToggle.checked = previousValue;
+        updateIdleState();
+        status.textContent = "Could not save the automatic matches preference.";
         return;
       }
-      button.disabled = true;
-      results.innerHTML = '<p class="aon-status" role="status">Finding relevant products using only the product fields above...</p>';
+
+      // Storage.onChanged is the durable path used by the shopping content
+      // script; send the same state directly to the active tab for immediate
+      // visual feedback while the popup is open.
       try {
-        const response = await chrome.runtime.sendMessage({
-          type: "AON_QUERY_PRODUCT",
-          product: {
-            title: productContext.title,
-            category: productContext.category,
-            price: productContext.price,
-            currency: productContext.currency
-          }
-        });
-        renderAonOffers(response);
-      } catch {
-        results.innerHTML = "<p class=\"aon-status\">We couldn't load product matches right now. Local tracking still works.</p>";
-      } finally {
-        button.disabled = !productContext;
+        const activeTab = await getActiveTabDetails();
+        if (activeTab && activeTab.id != null && chrome.tabs.sendMessage) {
+          chrome.tabs.sendMessage(activeTab.id, {
+            type: "AON_AUTO_MATCHES_CHANGED",
+            enabled: autoMatchesEnabled
+          }, () => {
+            void (chrome.runtime && chrome.runtime.lastError);
+          });
+        }
+      } catch { }
+
+      if (!autoMatchesEnabled) {
+        status.textContent = productContext
+          ? "Suggestions are off. Nothing is sent to AON."
+          : "Automatic matches are off until you enable them again.";
+        return;
       }
+
+      if (!activeShoppingPage) {
+        status.textContent = "Showing your latest sponsored suggestions.";
+        showLastOffers("Showing your latest sponsored suggestions.").then(reused => {
+          if (!reused) status.textContent = "No saved sponsored suggestions yet.";
+        });
+        return;
+      }
+
+      status.textContent = "Automatic matches enabled. Loading relevant suggestions...";
+      requestOffers();
+    });
+
+    if (chrome.storage.onChanged) {
+      chrome.storage.onChanged.addListener((changes, area) => {
+        if (area !== "local" || !changes[AUTO_MATCHES_KEY]) return;
+        const enabled = changes[AUTO_MATCHES_KEY].newValue === true;
+        if (enabled === autoMatchesEnabled) return;
+        autoMatchesEnabled = enabled;
+        autoToggle.checked = enabled;
+        if (!enabled) {
+          requestRevision += 1;
+          results.replaceChildren();
+          status.textContent = "Automatic matches are off until you enable them again.";
+        } else {
+          status.textContent = "Automatic matches enabled on Amazon and Flipkart.";
+          if (activeShoppingPage) requestOffers();
+          else showLastOffers("Showing your latest sponsored suggestions.").then(reused => {
+            if (!reused) status.textContent = "No saved sponsored suggestions yet.";
+          });
+        }
+        updateIdleState();
+      });
+    }
+
+    const initialize = async () => {
+      await loadAutoMatchesPreference();
+      const [product, shoppingDetails] = await Promise.all([
+        getActiveProductContext(),
+        getActiveShoppingDetails()
+      ]);
+      showProductContext(product, shoppingDetails);
+    };
+
+    initialize().catch(() => showProductContext(null, { isShopping: false, intent: "" }));
+
+    form.addEventListener("submit", event => {
+      event.preventDefault();
+      requestOffers();
     });
   }
 
@@ -796,6 +1082,14 @@
   document.getElementById("siteSwitcher").addEventListener("change",
     t => c(t.target.value));
   var L = document.getElementById("themeToggleBtn");
+  function updateThemeToggle() {
+    if (!L) return;
+    const dark = document.body.classList.contains("dark-theme");
+    const nextTheme = dark ? "light" : "dark";
+    L.setAttribute("aria-pressed", String(dark));
+    L.setAttribute("aria-label", `Switch to ${nextTheme} theme`);
+    L.setAttribute("title", `Switch to ${nextTheme} theme`);
+  }
   L && L.addEventListener("click",
     () => {
       document.body.classList.toggle("dark-theme");
@@ -803,10 +1097,12 @@
         localStorage.setItem("theme",
           document.body.classList.contains("dark-theme") ? "dark" : "light")
       } catch { }
+      updateThemeToggle();
     });
   try {
     (localStorage.getItem("theme")==="dark" || (!localStorage.getItem("theme") && window.matchMedia("(prefers-color-scheme: dark)").matches)) && document.body.classList.add("dark-theme")
   } catch { }
+  updateThemeToggle();
 
   var C = ["methodologyLink",
     "footerMethodologyLink"];
@@ -819,6 +1115,124 @@
           }))
       })
   });
+
+  function setupPopupTabs() {
+    const readAttribute = (element, name) => element && typeof element.getAttribute === "function"
+      ? element.getAttribute(name) || ""
+      : element && element[name] || "";
+    const byId = id => typeof document.getElementById === "function" ? document.getElementById(id) : null;
+    const findElement = (ids, selectors) => {
+      for (const id of ids) {
+        const element = byId(id);
+        if (element) return element;
+      }
+      if (typeof document.querySelector === "function") {
+        for (const selector of selectors) {
+          try {
+            const element = document.querySelector(selector);
+            if (element) return element;
+          } catch { }
+        }
+      }
+      return null;
+    };
+    const shoppingTab = findElement(
+      ["shoppingTab", "shopping-tab", "shoppingTabButton", "shopping-tab-button"],
+      ['[data-popup-tab="shopping"]', '[data-tab="shopping"]', ".popup-tab-shopping", ".tab-shopping", ".shopping-tab"]
+    );
+    const aiFootprintsTab = findElement(
+      ["aiFootprintsTab", "ai-footprints-tab", "aiFootprintsTabButton", "ai-footprints-tab-button", "aiTab"],
+      ['[data-popup-tab="ai-footprints"]', '[data-popup-tab="aiFootprints"]', '[data-tab="ai-footprints"]', '[data-tab="aiFootprints"]', ".popup-tab-ai-footprints", ".tab-ai-footprints", ".ai-footprints-tab"]
+    );
+    if (!shoppingTab || !aiFootprintsTab) return;
+
+    const panelFor = (tab, ids, selectors) => {
+      const controls = readAttribute(tab, "aria-controls").split(/\s+/).filter(Boolean);
+      for (const id of controls) {
+        const panel = byId(id);
+        if (panel) return panel;
+      }
+      return findElement(ids, selectors);
+    };
+    const shoppingPanel = panelFor(
+      shoppingTab,
+      ["shoppingPanel", "shopping-panel", "shoppingContent", "shopping-content", "shoppingTabPanel", "shoppingTabContent"],
+      ['[data-popup-panel="shopping"]', '[data-tab-panel="shopping"]', ".shopping-panel", ".popup-panel-shopping"]
+    );
+    const aiFootprintsPanel = panelFor(
+      aiFootprintsTab,
+      ["aiFootprintsPanel", "ai-footprints-panel", "aiFootprintsContent", "ai-footprints-content", "aiFootprintsTabPanel", "aiFootprintsTabContent", "aiTabPanel", "aiTabContent"],
+      ['[data-popup-panel="ai-footprints"]', '[data-popup-panel="aiFootprints"]', '[data-tab-panel="ai-footprints"]', '[data-tab-panel="aiFootprints"]', ".ai-footprints-panel", ".popup-panel-ai-footprints"]
+    );
+    if (!shoppingPanel || !aiFootprintsPanel) return;
+
+    const tabs = [
+      { key: "shopping", element: shoppingTab, panel: shoppingPanel },
+      { key: "ai-footprints", element: aiFootprintsTab, panel: aiFootprintsPanel }
+    ];
+
+    // Each popup opens on Shopping. Tab choice is deliberately transient and
+    // never shares state with AON consent or AI tracking storage.
+    let activeKey = "shopping";
+
+    const setPanelVisibility = (panel, visible) => {
+      if (!panel) return;
+      panel.hidden = !visible;
+      if (visible) {
+        if (typeof panel.removeAttribute === "function") panel.removeAttribute("hidden");
+      } else if (typeof panel.setAttribute === "function") {
+        panel.setAttribute("hidden", "");
+      }
+      if (typeof panel.setAttribute === "function") panel.setAttribute("aria-hidden", String(!visible));
+    };
+
+    const selectTab = key => {
+      if (!tabs.some(tab => tab.key === key)) return;
+      activeKey = key;
+      tabs.forEach(tab => {
+        const selected = tab.key === activeKey;
+        if (typeof tab.element.setAttribute === "function") {
+          tab.element.setAttribute("role", "tab");
+          tab.element.setAttribute("aria-selected", String(selected));
+          tab.element.setAttribute("tabindex", selected ? "0" : "-1");
+        }
+        tab.element.tabIndex = selected ? 0 : -1;
+        setPanelVisibility(tab.panel, selected);
+      });
+    };
+
+    tabs.forEach(tab => {
+      tab.element.addEventListener("click", event => {
+        if (typeof event.preventDefault === "function") event.preventDefault();
+         selectTab(tab.key);
+      });
+      tab.element.addEventListener("keydown", event => {
+        const index = tabs.indexOf(tab);
+        if (event.key === "ArrowRight" || event.key === "ArrowDown"
+          || event.key === "ArrowLeft" || event.key === "ArrowUp"
+          || event.key === "Home" || event.key === "End") {
+          if (typeof event.preventDefault === "function") event.preventDefault();
+          const forward = event.key === "ArrowRight" || event.key === "ArrowDown";
+          const backward = event.key === "ArrowLeft" || event.key === "ArrowUp";
+          const nextIndex = event.key === "Home" ? 0
+            : event.key === "End" ? tabs.length - 1
+              : forward ? (index + 1) % tabs.length
+                : backward ? (index - 1 + tabs.length) % tabs.length : index;
+          const nextTab = tabs[nextIndex];
+          selectTab(nextTab.key);
+          if (nextTab.element && typeof nextTab.element.focus === "function") nextTab.element.focus();
+          return;
+        }
+        if (event.key !== "Enter" && event.key !== " " && event.key !== "Spacebar" && event.key !== "Space") return;
+        if (typeof event.preventDefault === "function") event.preventDefault();
+        selectTab(tab.key);
+      });
+    });
+
+    selectTab(activeKey);
+  }
+
+  setupPopupTabs();
   setupAonOfferForm();
   c();
 })();

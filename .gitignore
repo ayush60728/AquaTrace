@@ -1,0 +1,19 @@
+build/
+__pycache__/
+# Private/local development files
+AquaTrace/.opencode/
+.opencode/
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.p12
+*.log
+credentials*
+secrets*
+
+# Release artifacts
+AquaTrace/build/
+*.zip
+.vscode/

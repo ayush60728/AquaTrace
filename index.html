@@ -23,8 +23,10 @@
   <h2>Summary</h2>
   <p>
     AquaTrace keeps footprint tracking local. An optional shopping-product
-    search is separate and only sends a small allowlisted product snapshot after you click
-    <strong>Find relevant products</strong>.
+    search is separate and sends only a small allowlisted product snapshot,
+    cleaned shopping search keywords, or a generic request
+    after you enable automatic matches once. With the checkbox off, no AON
+    requests are made, including from the popup.
   </p>
 
   <h2>What the extension does</h2>
@@ -38,7 +40,7 @@
 
   <h2>What data is stored, and where</h2>
   <p>
-    The extension stores only aggregate numbers -- prompt counts and token
+    For AI tracking, the extension stores aggregate numbers -- prompt counts and token
     counts per site -- plus up to 100 local conversation summaries containing
     timestamps, site, model, and token counts. It uses Chrome's built-in local
     extension storage
@@ -51,28 +53,51 @@
     <li>Does not include the actual text of your conversations -- only token counts</li>
     <li>Persists only until you click "Reset" in the extension, or uninstall it</li>
   </ul>
+  <p>
+    The shopping opt-in and a daily request counter are also saved locally.
+    Offer queries and responses are cached in extension session storage for
+    ten minutes, never in Chrome sync or a shopping site's storage. The quota
+    allows up to 50 query attempts per UTC day per browser profile, including
+    empty results, errors and fallbacks. Neither this counter nor AI history is
+    included in AON requests.
+  </p>
 
   <h2>Permissions this extension uses, and why</h2>
   <ul>
     <li><strong>storage</strong> -- to save your running token counts locally, so they persist between browser sessions.</li>
     <li><strong>activeTab</strong> -- to detect which supported AI site your current tab is on, only at the moment you open the extension's popup.</li>
     <li><strong>Host access to chatgpt.com, chat.openai.com, claude.ai, gemini.google.com, and chat.deepseek.com</strong> -- to read prompt/response text on those specific pages in order to count tokens. No other pages are read for tracking.</li>
-    <li><strong>Host access to Amazon and Flipkart product pages</strong> -- to read only the product title, category, displayed price, and currency locally when the popup requests a preview. The content script does not send data automatically.</li>
-    <li><strong>Host access to api.aon.pro</strong> -- to request optional sponsored product matches after you submit the product search.</li>
+    <li><strong>Host access to Amazon and Flipkart pages</strong> -- to read product title, category, displayed price, and currency locally, or cleaned search keywords when product context is unavailable, for the opt-in in-page offer bar and popup preview.</li>
+    <li><strong>Host access to api.aon.pro</strong> -- to request optional sponsored product matches automatically after you enable the checkbox.</li>
   </ul>
 
   <h2>Third parties</h2>
   <p>
-    AquaTrace does not use analytics. If you opt in by clicking the product
-    search button, only the displayed product title, category, price, and
-    currency are sent to AON (Agent Offer Network) to return sponsored
-    matches. The product URL, seller, page text, cookies, account data, AI
-    chat text, token counts, local history, and tab metadata are not included.
+    AquaTrace does not use analytics. After you enable automatic matches once,
+    only the displayed product title, category, price, and currency are sent to
+    AON (Agent Offer Network) to return sponsored matches. Without a product
+    snapshot, only cleaned Amazon <code>k</code> or Flipkart <code>q</code>
+    search keywords, or the text <em>Show me relevant offers</em>, are sent instead.
+    Popup refreshes require the same checkbox and use the same allowlist.
+    The product URL, seller, page text,
+    cookies, account data, AI chat text, token counts, local history, and tab
+    metadata are not included.
     Normal HTTPS connection metadata, such as an IP address, may still be
     visible to AON; AquaTrace does not add a user ID, cookie, or account
     identifier.
     Offer links are provided by AON, and AquaTrace may earn a commission if
-    you choose one.
+    you choose one. Images are requested without cross-origin credentials or
+    referrers. Clicking an offer opens its direct tracking link; the destination's
+    own privacy policy and normal browser navigation behavior then apply.
+  </p>
+  <p>
+    Automatic offers are off by default and can be turned off using the popup
+    checkbox. The first upgrade to this automatic-offer feature resets the
+    earlier popup-only opt-in and opens a one-time onboarding page to ask for
+    this broader automatic feature.
+    Opt-out aborts pending requests but cannot retract data already sent.
+    Dismissal and the last non-empty offers are kept per tab in
+    extension session storage and are removed when the tab or browser session ends.
   </p>
 
   <h2>Changes to this policy</h2>

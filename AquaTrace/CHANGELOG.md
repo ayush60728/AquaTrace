@@ -2,16 +2,52 @@
 
 All notable changes to AquaTrace will be documented in this file.
 
-## Unreleased
+## [2.0.0] - 2026-10-20
 ### Added
-- Shopping product context for optional, user-initiated AON product matches on Amazon and Flipkart.
-- Up to three clearly labeled sponsored offer cards with HTTPS tracking links,
-  source labels, prices, descriptions, and optional product images.
+- Reorganized the popup into **Shopping** and **AI Footprints** tabs, with
+  Shopping selected by default on each popup open. AI footprint metrics, local
+  history, export, reset, Copy Summary and methodology actions live in the AI
+  Footprints tab. The selected tab is transient; every new popup opens on
+  Shopping.
+- One-time opt-in automatic AON sponsored offers on Amazon.in, Amazon.com, and
+  Flipkart, without requiring popup clicks for each page.
+- A slim collapsible Shadow DOM offer bar with up to three clearly labeled
+  sponsored offer cards containing HTTPS action links, source labels, prices,
+  titles, and optional product images.
+- SPA navigation and DOM-change detection with product-context priority, cleaned
+  Amazon `k`/Flipkart `q` fallback queries, and bounded
+  title/category retries.
+- First-install/upgrade onboarding page with one unchecked opt-in checkbox and
+  the plain-language disclosure. The old popup-only preference is reset once
+  for consent to automatic shopping/search requests; later reloads keep the choice.
+- Shopping suggestions now remain visible in the popup outside Amazon/Flipkart:
+  active shopping pages load live product/search/starter offers, while other
+  pages reuse the latest non-empty sponsored offers from extension session storage.
+- Ten-minute session query caching, concurrent-request deduplication, and a
+  persistent cap of 50 query attempts per UTC day per browser profile.
+- Dependency-free release validation/packaging with `python3 build.py` and
+  automated background/UI integration fixtures for the nine acceptance flows.
 
 ### Privacy
-- Offer searches send only product title, category, displayed price, and currency
-  after explicit user action. URLs, seller/account data, page text, cookies, AI
-  conversation data, and local history are excluded.
+- Automatic offer searches remain off until the user enables
+  `aonAutoMatchesEnabled`. Searches send only product title, category,
+  displayed price, and currency, or cleaned shopping search keywords or a
+  generic request when product context is missing. URLs, seller/account data, page text, cookies,
+  AI conversation data, and local history are excluded.
+- Unchecking the popup setting removes the bar immediately, aborts in-flight
+  requests, and blocks queued fallbacks and manual popup refreshes. Errors
+  and empty responses hide the bar without clearing the last non-empty offers
+  retained for the current session.
+- Live AON queries omit credentials/referrers and never send an Authorization
+  header. HTTP 200 errors are rejected, and only trace IDs are logged.
+
+### Fixed
+- Prefer the page breadcrumb over JSON-LD and generic menus for categories;
+  reject categories longer than 60 characters.
+- Preserve direct HTTPS offer links verbatim, reject URL credentials, render
+  offer text via textContent, and default missing action labels to “View deal”.
+- Existing AI token tracking, models, history, export and Copy Summary remain
+  separate; the AI content bundle is unchanged.
 
 ## [1.2.0] - 2026-10-18
 ### Added

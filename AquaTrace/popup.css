@@ -145,6 +145,56 @@ body {
   line-height: 1.4;
 }
 
+/* Popup view tabs */
+.popup-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  padding: 3px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--banner-bg);
+}
+
+.popup-tab {
+  flex: 1;
+  min-width: 0;
+  min-height: 30px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s, box-shadow 0.15s;
+}
+
+.popup-tab:hover {
+  color: var(--text-main);
+}
+
+.popup-tab[aria-selected="true"] {
+  background: var(--bg-card);
+  color: var(--text-main);
+  box-shadow: var(--shadow-sm);
+}
+
+.popup-tab:focus-visible {
+  outline: 2px solid var(--accent-blue-text);
+  outline-offset: 1px;
+}
+
+.tab-panel {
+  min-width: 0;
+}
+
+.tab-panel[hidden] {
+  display: none;
+}
+
 /* AON product offers */
 .aon-card {
   background: var(--bg-card);
@@ -229,6 +279,52 @@ body {
   display: flex;
   flex-direction: column;
   gap: 9px;
+}
+
+.aon-auto-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--banner-bg);
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.aon-auto-toggle input {
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  margin: 1px 0 0;
+  accent-color: var(--primary-blue);
+  cursor: pointer;
+}
+
+.aon-auto-toggle-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.aon-auto-toggle-copy strong {
+  color: var(--text-main);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.aon-auto-toggle-copy small {
+  color: var(--text-muted);
+  font-size: 9.5px;
+  line-height: 1.3;
+}
+
+.aon-auto-toggle:focus-within {
+  outline: 2px solid var(--accent-blue-text);
+  outline-offset: 2px;
 }
 
 .aon-field {
@@ -325,7 +421,11 @@ body {
   border: 1px solid var(--border-color);
   border-radius: 10px;
   background: var(--bg-main);
+  text-decoration: none;
+  color: inherit;
 }
+
+.aon-offer:hover { border-color: var(--accent-blue-text); }
 
 .aon-offer-image,
 .aon-offer-image-placeholder {

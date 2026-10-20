@@ -12,10 +12,56 @@
 
   <div class="privacy-badge">
     <strong>Privacy:</strong> All tokenization and calculation happens locally,
-    in your browser. No conversation text, token counts, or usage stats are
-    ever sent anywhere. Data lives only in this browser's local extension
-    storage until you clear it or uninstall the extension.
+    in your browser. Conversation text, token counts, and usage stats are never
+    sent to AON. The optional offer search is separate: after one-time opt-in,
+    supported shopping pages can request matches automatically using only
+    product fields, cleaned shopping search keywords, or a generic request.
+    Tracking data lives only in this browser's local
+    extension storage until you clear it or uninstall the extension.
   </div>
+
+  <h2>Optional automatic AON product matches</h2>
+  <p>
+    On Amazon.in, Amazon.com, and Flipkart, AquaTrace reads a bounded product
+    snapshot locally. Product context is used first; when no product context is
+    available, it cleans the Amazon <code>k</code> or Flipkart <code>q</code>
+    search value before using it, with a generic request as the final fallback.
+    After you enable <strong>Show sponsored product suggestions while I shop on Amazon and Flipkart</strong> once,
+    it sends the displayed product title, category, price, and currency—or
+    cleaned search keywords, or the generic text <em>Show me relevant offers</em>—to
+    AON over HTTPS. It does not send the page URL, page text, seller, account
+    data, cookies, AI conversations, or local tracking history. Returned offers
+    are clearly labeled sponsored results, and choosing an offer opens its
+    HTTPS destination in a new tab. Uncheck the setting in the popup to hide
+    the in-page offer bar and stop AON requests. In-flight requests are aborted;
+    this cannot retract data already sent before you turned the switch off.
+  </p>
+  <p>
+    Automatic offers are off by default. Installation or the first upgrade to
+    the automatic-offer feature opens a separate onboarding page with one
+    unchecked opt-in checkbox.
+    The older popup-only preference is reset for this broader automatic feature.
+    Empty results are retried with brand/model
+    text, a category word, and finally the generic request. Page changes are
+    debounced for about 800 milliseconds. The bar shows up to three sponsored
+    cards and can be collapsed or dismissed for the tab. Dismissal and the last
+    non-empty offers are kept only in extension session storage; errors and
+    empty responses hide the bar without erasing that session cache.
+  </p>
+  <p>
+    Identical offer queries (including empty results) are cached in
+    <code>chrome.storage.session</code> for ten minutes. AquaTrace makes at most
+    50 AON query attempts per UTC day per browser profile, including fallback
+    attempts and failures. Only the day and counter persist locally across
+    browser restarts. AON's separate placement-wide cap is 1,000 offers per day;
+    its small catalog, availability, or that cap can leave the bar empty.
+    Requests time out after eight seconds. HTTPS requests omit credentials and
+    referrers; AON still sees ordinary connection metadata such as an IP address.
+    Offer images load without cross-origin credentials or referrers and may
+    appear as placeholders if the image server does not permit that. Clicking
+    a sponsored card navigates directly to its supplied HTTPS tracking link;
+    the destination's own privacy policy then applies. No click-report API is called.
+  </p>
 
   <p><a href="#version-history">View changelog</a></p>
 
@@ -156,7 +202,17 @@
   </p>
 
   <h2 id="version-history">Version History & Features</h2>
-  <p><strong>Version 1.2.0</strong> (Current)</p>
+  <p><strong>Version 2.0.0</strong> (Current)</p>
+  <ul>
+    <li>Added separate Shopping and AI Footprints popup tabs, with Shopping selected by default.</li>
+    <li>Added one-time opt-in automatic sponsored offers on Amazon.in, Amazon.com, and Flipkart.</li>
+    <li>Added a collapsible Shadow DOM offer bar with up to three HTTPS offer cards and session dismissal.</li>
+    <li>Added SPA navigation and page-update detection with bounded product/search fallback queries.</li>
+    <li>Added persistent popup suggestions outside shopping sites using the latest non-empty session offers.</li>
+    <li>Kept live product, search and starter suggestions on Amazon.in, Amazon.com and Flipkart.</li>
+  </ul>
+
+  <p><strong>Version 1.2.0</strong></p>
   <ul>
     <li>Added site-specific assistant-response adapters for supported AI sites.</li>
     <li>Added live current-model detection when the popup is opened.</li>
