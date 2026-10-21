@@ -185,7 +185,7 @@
   }
 
   function saveSession(update) {
-    sendMessage({ type: "AON_SET_TAB_SESSION", ...update }).catch(() => {});
+    sendMessage({ type: "AON_SET_TAB_SESSION", sessionId: pageSessionId, ...update }).catch(() => {});
   }
 
   function makeElement(tagName, className, text) {
@@ -242,7 +242,7 @@
   collapseButton.setAttribute("aria-expanded", "true");
   const dismissButton = makeElement("button", "header-button", "Dismiss");
   dismissButton.type = "button";
-  dismissButton.setAttribute("aria-label", "Dismiss sponsored offers for this tab");
+  dismissButton.setAttribute("aria-label", "Dismiss sponsored offers for this page");
   header.append(brand, summary, collapseButton, dismissButton);
   const content = makeElement("div", "content");
   panel.append(header, content);
@@ -261,6 +261,11 @@
   let lastRequestKey = "";
   let lastOffers = [];
   let observedHref = location.href;
+  // A fresh content-script document gets a fresh token. The worker can retain
+  // the tab's offer cache without making a dismissal survive a reload or SPA
+  // document change.
+  let pageSessionId = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
 
   function hideBar() {
     barHost.hidden = true;
@@ -412,12 +417,20 @@
 
   async function initializePreference() {
     const revision = preferenceRevision;
+    const sessionId = pageSessionId;
     const [stored, session] = await Promise.all([
       storageGet(AUTO_MATCHES_KEY),
-      sendMessage({ type: "AON_GET_TAB_SESSION" }).catch(() => null)
+      sendMessage({ type: "AON_GET_TAB_SESSION", sessionId }).catch(() => null)
     ]);
     if (revision === preferenceRevision) {
       autoMatchesEnabled = stored[AUTO_MATCHES_KEY] === true;
+    }
+    if (sessionId !== pageSessionId) {
+      initialized = true;
+      dismissed = false;
+      if (autoMatchesEnabled) refreshOffers(true);
+      else hideBar();
+      return;
     }
     dismissed = Boolean(session && session.dismissed);
     lastOffers = session && Array.isArray(session.lastOffers)
@@ -435,6 +448,9 @@
   function scheduleRefresh() {
     if (location.href !== observedHref) {
       observedHref = location.href;
+      pageSessionId = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+      dismissed = false;
       requestSequence += 1;
       lastRequestKey = "";
       if (autoMatchesEnabled) hideBar();

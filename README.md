@@ -1,6 +1,6 @@
 # AquaTrace  System Architecture
 
-This document describes how AquaTrace's pieces fit together. For feature docs and setup instructions, For the water/energy/CO2 calculation methodology, see [methodology.html](./AquaTrace/methodology.html).
+This document describes how AquaTrace's pieces fit together. For the water/energy/CO2 calculation methodology, see [methodology.html](./AquaTrace/methodology.html).
 
 ## High-level architecture
 
@@ -33,11 +33,21 @@ graph LR
         UI --> CFG
     end
 
+    subgraph SHOP["🛒 Supported shopping pages"]
+        direction TB
+        BAR["shopping-offers.js\nautomatic top-of-page offer bar"]
+        PRODUCT["product-context.js\nlocal product-field extraction"]
+        HISTORY["shopping-history.js\nSPA navigation bridge"]
+    end
+
     %% ── Flows ────────────────────────────────────────────
     CS -->|"PROMPT_SENT\n(tokens, detected model)"| BG
      UI -->|"SET_MODEL / RESET_SITE /\nRESET_ALL / USE_AUTO_DETECT / AON_QUERY_PRODUCT"| BG
-    UI -->|"tabs.query (activeTab)"| TAB
-    UI -->|"read state"| STORE
+     UI -->|"tabs.query (activeTab)"| TAB
+     UI -->|"read state"| STORE
+     BAR -->|"AON_QUERY_PRODUCT / AON_QUERY_INTENTS\nautomatic after opt-in"| BG
+     PRODUCT --> BAR
+     HISTORY --> BAR
 ```
 
 ## Components
@@ -46,7 +56,7 @@ graph LR
 
 | **`dist/content.bundle.js`** (content script) | Injected into supported AI chat pages only. Detects when a prompt is submitted and when a response finishes streaming, counts tokens for both using the bundled tokenizer, scans the page for the currently selected model name, and sends the result to the background script. Never sends the actual conversation text anywhere only token counts. |
 | **`dist/background.bundle.js`** (service worker) | The only long lived piece. Owns all persisted state in `chrome.storage.local`, keyed per site. Applies auto detected models unless the user has manually overridden that site's choice. Handles reset requests. |
-| **`dist/popup.bundle.js`** (popup UI) | Runs only while the popup is open. Determines which site's card to show by querying the active tab, reads state from storage, and renders it. Sends messages to the background script for any state changes (model picks, resets) rather than writing storage directly. It also keeps the shopping opt-in toggle synchronized with the in-page offer bar. |
+| **`dist/popup.bundle.js`** (popup UI) | Runs only while the popup is open. Determines which site's card to show by querying the active tab, reads state from storage, renders AI metrics, and can show shopping offers. Sends messages to the background script for any state changes (model picks, resets) rather than writing storage directly. It also keeps the shopping opt-in toggle synchronized with the automatic in-page offer bar. |
 | **`product-context.js`** (shopping content script) | Runs only on supported Amazon and Flipkart pages. It extracts only product title, category, price, and currency locally in response to `GET_PRODUCT_DATA`; the companion `shopping-offers.js` uses that context for automatic offers only after the one-time opt-in. |
 | **`shopping-offers.js`** (shopping content script) | Injects the collapsible Shadow DOM offer bar, observes SPA navigation and page updates, and requests bounded sponsored offers without reading AI tracking data. |
 | **Model profile constants** (bundled) | The current repository commits generated bundles rather than a shared source module, so profile values and detection rules are duplicated across the background, popup, and content bundles. Keep them synchronized or add a reproducible build source before changing model data. |
@@ -57,7 +67,7 @@ graph LR
 ## Why this shape
 
 - **AI tracking updates are serialized in the background.** The tracking content script sends counted tokens to the background worker rather than writing totals itself. The separate shopping script observes its opt-in setting and keeps tab UI state through the session-storage bridge.
-- **Popup never runs in the background.** It only exists while open, so it always re derives "which site am I looking at" fresh from `chrome.tabs.query` rather than trying to stay in sync with a background process.
+- **Popup never runs in the background.** It only exists while open, so it always re derives "which site am I looking at" fresh from `chrome.tabs.query` rather than trying to stay in sync with a background process. The shopping offer bar is a separate content-script flow and continues working when the popup is closed.
 - **Single source of truth is still a follow-up.** The generated bundles currently contain duplicated model configuration; changing a model's energy estimate or detection pattern requires updating each affected bundle consistently.
 
 ## Data flow for a single prompt (end to end)
@@ -85,7 +95,8 @@ AquaTrace is a browser extension that estimates the water, energy, and CO₂ foo
 - **Multi-Platform Support**: Works with ChatGPT, Claude AI, Gemini, and DeepSeek
 - **Independent Site Tracking**: Each AI service tracked separately with its own counters
 - **Privacy-First Tracking**: Footprint calculations and conversation history stay local; shopping offers are separate and require a one-time opt-in
-- **Shopping product matches**: After opt-in, Amazon.in, Amazon.com, and Flipkart pages show up to three labeled sponsored offers using a bounded product snapshot, cleaned search keywords, or a generic starter request
+- **Shopping product matches**: After opt-in, Amazon.in, Amazon.com, and Flipkart pages automatically show up to three labeled sponsored offers in a top-of-page bar; the popup can show the current or latest offers too, using a bounded product snapshot, cleaned search keywords, or a generic starter request
+- **Offer dismissal**: Dismissing the bar hides it for that page document only. It reappears after a refresh, on a new tab, in another tab, or after SPA navigation to a new page.
 - **Company-Specific Estimates**: Uses accurate WUE (Water Usage Effectiveness) and carbon intensity data for each hosting provider
 
 ### Version 2.0.0 updates
@@ -259,7 +270,7 @@ directory contains local development attachments and must not be published. The
 release ZIP is a build output, not a source file, and must not be committed.
 
 The current Web Store package is generated at
-`AquaTrace/build/AquaTrace-2.0.0.zip`; it is ignored and should be uploaded to
+`AquaTrace/build/AquaTrace-2.0.1.zip`; it is ignored and should be uploaded to
 the Web Store separately rather than committed by default.
 
 Before committing, inspect the staged file list and scan for credentials:

@@ -10,6 +10,11 @@ All notable changes to AquaTrace will be documented in this file.
   security, sponsored links, and Chrome Web Store Limited Use disclosures.
 - Bumped the extension version for the Chrome Web Store submission.
 
+### Fixed
+- Dismissing the in-page sponsored-offer bar now applies only to the current
+  page document. The bar returns after refresh, on new tabs, on other tabs, and
+  after same-tab navigation to a new shopping page.
+
 ## [2.0.0] - 2026-10-20
 ### Added
 - Reorganized the popup into **Shopping** and **AI Footprints** tabs, with

@@ -10,6 +10,7 @@ const load = file => fs.readFileSync(path.join(__dirname, "..", file), "utf8");
 const source = load("shopping-offers.js");
 const historySource = load("shopping-history.js");
 const extractorSource = load("product-context.js");
+const buildSource = load("build.py");
 const clone = value => JSON.parse(JSON.stringify(value));
 const flush = () => new Promise(resolve => setImmediate(resolve));
 
@@ -71,7 +72,8 @@ const offer = (index = 1) => ({
 });
 
 function browser({ enabled, url = "https://www.amazon.in/s?k=headphones", product = null,
-  response = { ok: true, offers: [offer()] }, session = {}, network = null, nodes = null } = {}) {
+  response = { ok: true, offers: [offer()] }, session = {}, network = null, nodes = null,
+  tabId = 7, networkSession = {} } = {}) {
   const root = new Element("html");
   const created = [];
   const document = { documentElement: root, body: root, createElement: tag => {
@@ -86,7 +88,6 @@ function browser({ enabled, url = "https://www.amazon.in/s?k=headphones", produc
   const fetchCalls = [];
   const workerEvents = {};
   const openedTabs = [];
-  const networkSession = {};
   let workerSend;
   let currentNodes = nodes;
   document.querySelector = selector => (currentNodes && currentNodes[selector] || [])[0] || null;
@@ -136,10 +137,18 @@ function browser({ enabled, url = "https://www.amazon.in/s?k=headphones", produc
             if (message.type.startsWith("AON_QUERY_")) requests.push(clone(message));
             result = await workerSend(message);
           }
-          else if (message.type === "AON_GET_TAB_SESSION") result = clone(session);
+          else if (message.type === "AON_GET_TAB_SESSION") {
+            result = clone(session);
+            if (message.sessionId) {
+              result.dismissed = session.dismissedSessionId === message.sessionId;
+            }
+          }
           else if (message.type === "AON_SET_TAB_SESSION") {
             if (message.lastOffers) session.lastOffers = clone(message.lastOffers);
-            if (message.dismissed) session.dismissed = true;
+            if (message.dismissed) {
+              session.dismissed = true;
+              session.dismissedSessionId = message.sessionId || "";
+            }
             result = clone(session);
           } else {
             requests.push(clone(message));
@@ -188,7 +197,7 @@ function browser({ enabled, url = "https://www.amazon.in/s?k=headphones", produc
     worker.importScripts = (...files) => files.forEach(file => vm.runInContext(load(file.replace(/^\.\.\//, "")), worker));
     vm.runInContext(load("dist/background.bundle.js"), worker);
     workerSend = message => new Promise(resolve => {
-      listeners.forEach(listener => listener(message, { tab: { id: 7 }, frameId: 0 }, value => resolve(clone(value))));
+      listeners.forEach(listener => listener(message, { tab: { id: tabId }, frameId: 0 }, value => resolve(clone(value))));
     });
   }
   vm.createContext(context);
@@ -201,6 +210,18 @@ function browser({ enabled, url = "https://www.amazon.in/s?k=headphones", produc
     setNodes: value => { currentNodes = value; },
     find: predicate => find(host.shadowRoot, predicate),
     text: () => host.shadowRoot.textContent,
+    reload: options => browser({
+      enabled: local.aonAutoMatchesEnabled,
+      url: location.href,
+      product: currentProduct,
+      response: currentResponse,
+      session,
+      network,
+      nodes: currentNodes,
+      tabId,
+      networkSession,
+      ...options
+    }),
     setProduct: value => { currentProduct = value; },
     setResponse: value => { currentResponse = value; },
     preferenceChange,
@@ -325,7 +346,7 @@ test("empty/error responses hide without replacing the last non-empty tab-sessio
   }
 });
 
-test("dismissal survives same-tab navigation and is not shared with a different tab", async () => {
+test("dismissal hides the current page, then same-tab navigation shows a fresh page", async () => {
   const page = browser({ enabled: true });
   await flush();
   const collapse = page.find(element => element.textContent === "Collapse")[0];
@@ -334,12 +355,42 @@ test("dismissal survives same-tab navigation and is not shared with a different 
   page.find(element => element.textContent === "Dismiss")[0].dispatchEvent({ type: "click" });
   await flush();
   assert.equal(page.session.dismissed, true);
-  const nextPage = browser({ enabled: true, url: "https://www.flipkart.com/", session: page.session });
-  const otherTab = browser({ enabled: true, url: "https://www.flipkart.com/" });
+  page.history.pushState(null, "", "/s?k=speakers");
+  await page.tick();
+  assert.equal(page.host.hidden, false);
+  assert.equal(page.requests.length, 2, "a new page should request fresh offers after dismissal");
+});
+
+test("fresh tabs do not inherit another tab's dismissal", async () => {
+  const dismissedTab = browser({ enabled: true });
   await flush();
-  assert.equal(nextPage.host.hidden, true);
-  assert.equal(nextPage.requests.length, 0);
-  assert.equal(otherTab.requests.length, 1);
+  dismissedTab.find(element => element.textContent === "Dismiss")[0]
+    .dispatchEvent({ type: "click" });
+  await flush();
+
+  const freshTab = browser({ enabled: true, url: "https://www.flipkart.com/" });
+  await flush();
+  assert.equal(freshTab.host.hidden, false);
+  assert.equal(freshTab.requests.length, 1);
+  assert.equal(freshTab.session.dismissed, undefined);
+});
+
+test("a document refresh resets dismissal and request state while retaining tab offers", async () => {
+  const page = browser({ enabled: true });
+  await flush();
+  assert.equal(page.requests.length, 1);
+  assert.equal(page.host.hidden, false);
+
+  page.find(element => element.textContent === "Dismiss")[0].dispatchEvent({ type: "click" });
+  await flush();
+  assert.equal(page.host.hidden, true);
+
+  const refreshed = page.reload();
+  await flush();
+  assert.notEqual(refreshed.host, page.host, "refresh must create a new document host");
+  assert.equal(refreshed.requests.length, 1, "refresh must not reuse the old document's request key");
+  assert.equal(refreshed.host.hidden, false);
+  assert.equal(refreshed.session.lastOffers.length, 1, "tab-session offers survive the refresh");
 });
 
 test("MAIN-world history bridge and debounced mutations refresh only after relevant changes", async () => {
@@ -358,8 +409,24 @@ test("MAIN-world history bridge and debounced mutations refresh only after relev
   await page.tick();
   assert.equal(page.requests.length, 3);
   assert.equal(page.observerOptions().characterData, true);
+});
+
+test("manifest and build allowlist include every shopping content-script input", () => {
   const manifest = JSON.parse(load("manifest.json"));
-  assert.equal(manifest.content_scripts.find(script => script.js.includes("shopping-history.js")).world, "MAIN");
+  const historyScript = manifest.content_scripts.find(script => script.js.includes("shopping-history.js"));
+  const offersScript = manifest.content_scripts.find(script => script.js.includes("shopping-offers.js"));
+
+  assert.deepEqual(historyScript.js, ["shopping-history.js"]);
+  assert.equal(historyScript.world, "MAIN");
+  assert.equal(historyScript.run_at, "document_start");
+  assert.deepEqual(offersScript.js, ["product-context.js", "shopping-offers.js"]);
+  assert.equal(offersScript.run_at, "document_idle");
+
+  for (const file of ["product-context.js", "shopping-offers.js", "shopping-history.js", "shopping-session.js"]) {
+    assert.match(buildSource, new RegExp(`"${file}"`), `${file} must be a release input`);
+  }
+  assert.match(buildSource, /glob\("\*\.test\.js"\)/, "build must discover regression tests");
+  assert.match(buildSource, /\["node", "--test", \*tests\]/, "build must run discovered tests");
 });
 
 test("a navigation while a request is pending cannot display stale offers or lose the new request", async () => {

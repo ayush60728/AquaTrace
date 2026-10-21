@@ -1,35 +1,53 @@
 // Service-worker bridge for tab-scoped UI state. chrome.storage.session is not
 // exposed to content scripts; this keeps offer caches off the shopping page's
-// own sessionStorage and preserves dismissal across same-tab site navigation.
+// own sessionStorage. Dismissal is additionally keyed by the page document so
+// a reload or a new SPA document starts with a visible bar again.
 (() => {
   "use strict";
 
   const memory = new Map();
   const pending = new Map();
   const keyFor = tabId => `aonShoppingTab:${tabId}`;
-  const emptyState = () => ({ dismissed: false, lastOffers: [] });
+  const emptyState = () => ({ dismissed: false, dismissedSessionId: "", lastOffers: [] });
 
-  async function readState(tabId) {
-    if (memory.has(tabId)) return memory.get(tabId);
+  function forSession(state, sessionId) {
+    if (!sessionId) return state;
+    return { ...state, dismissed: state.dismissedSessionId === sessionId };
+  }
+
+  async function readState(tabId, sessionId = "") {
+    if (memory.has(tabId)) return forSession(memory.get(tabId), sessionId);
     try {
       const stored = await chrome.storage.session.get(keyFor(tabId));
       const state = stored[keyFor(tabId)];
       if (state && typeof state === "object") {
         const normalized = {
           dismissed: state.dismissed === true,
+          dismissedSessionId: typeof state.dismissedSessionId === "string"
+            ? state.dismissedSessionId : "",
           lastOffers: Array.isArray(state.lastOffers) ? state.lastOffers.slice(0, 3) : []
         };
         memory.set(tabId, normalized);
-        return normalized;
+        return forSession(normalized, sessionId);
       }
     } catch { /* The in-memory fallback still lasts for this worker session. */ }
-    return emptyState();
+    const state = emptyState();
+    memory.set(tabId, state);
+    return forSession(state, sessionId);
   }
 
   async function updateState(tabId, message) {
     const previous = await readState(tabId);
+    const sessionId = typeof message.sessionId === "string" ? message.sessionId : "";
+    const dismissedSessionId = message.dismissed === true && sessionId
+      ? sessionId : previous.dismissedSessionId;
     const next = {
-      dismissed: message.dismissed === true || previous.dismissed,
+      // Keep the legacy boolean for callers that do not provide a page token.
+      // New content scripts receive dismissal only when their document token
+      // matches, so refreshes and SPA document changes do not inherit it.
+      dismissed: sessionId
+        ? dismissedSessionId === sessionId : message.dismissed === true || previous.dismissed,
+      dismissedSessionId,
       lastOffers: Array.isArray(message.lastOffers) && message.lastOffers.length
         ? message.lastOffers.slice(0, 3)
         : previous.lastOffers
@@ -49,7 +67,8 @@
       return false;
     }
     const operation = (pending.get(tabId) || Promise.resolve()).then(() => (
-      message.type === "AON_SET_TAB_SESSION" ? updateState(tabId, message) : readState(tabId)
+      message.type === "AON_SET_TAB_SESSION"
+        ? updateState(tabId, message) : readState(tabId, message.sessionId)
     ));
     pending.set(tabId, operation.catch(() => {}));
     operation.then(respond, () => respond(emptyState()));
