@@ -566,9 +566,8 @@
     };
   }
 
-  // The shopping-offers content script runs beside this reusable extractor in
-  // the same extension isolated world. Keeping the extractor here means the
-  // popup and the in-page offer bar share exactly the same product context.
+  // The popup and the in-page offer bar query this reusable extractor in the
+  // same extension isolated world so product context stays consistent.
   if (typeof globalThis !== "undefined") {
     globalThis.AquaTraceProductContext = Object.freeze({
       extractProductData,

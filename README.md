@@ -74,7 +74,7 @@ graph LR
 
 # 💧 AquaTrace - AI Environmental Footprint Tracker
 
-**Version 2.0.0**
+**Version 2.0.1**
 
 AquaTrace is a browser extension that estimates the water, energy, and CO₂ footprint of your AI chat conversations across ChatGPT, Claude, Gemini, and DeepSeek.
 
@@ -133,7 +133,7 @@ AquaTrace is a browser extension that estimates the water, energy, and CO₂ foo
 5. Click "Load unpacked"
 6. Select the extension folder
 
-### Build, test and reload 2.0.0
+### Build, test and reload 2.0.1
 
 The checkout does **not** include the original sources/bundler for `dist/*.bundle.js`.
 The existing background and popup bundles were patched carefully; the AI-tracking
@@ -149,7 +149,7 @@ python3 build.py
 
 Node 18+ and Python 3.8+ are required. The release command checks runtime JavaScript
 syntax, manifest references, and regression tests, then creates a deterministic
-`build/AquaTrace-2.0.0.zip` containing only explicitly allowlisted extension files.
+`build/AquaTrace-2.0.1.zip` containing only explicitly allowlisted extension files.
 It excludes private attachments, `.opencode`, local configuration, and test fixtures.
 
 1. In `chrome://extensions`, click **Reload** on the existing unpacked AquaTrace,
@@ -248,7 +248,7 @@ not embed a secret in this repository or extension package.
 
 The extension sends shopping data to AON only after the user enables the
 automatic-suggestions checkbox. It sends only the bounded product fields or
-cleaned search intent described above. See the [privacy policy](./index.html)
+cleaned search intent described above. See the [privacy policy](https://ayush60728.github.io/AquaTrace/)
 and [methodology](./AquaTrace/methodology.html) for the complete disclosure.
 
 ### GitHub publishing hygiene

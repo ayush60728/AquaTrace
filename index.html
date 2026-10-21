@@ -2,6 +2,9 @@
 <html>
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="AquaTrace privacy policy and Chrome Web Store data-use disclosure." />
+  <link rel="canonical" href="https://ayush60728.github.io/AquaTrace/" />
   <title>Privacy Policy - AquaTrace</title>
   <style>
     body {
@@ -18,15 +21,21 @@
 </head>
 <body>
   <h1>Privacy Policy — AquaTrace</h1>
-  <p><em>Last updated: October 2026</em></p>
+  <p><em>Last updated: October 21, 2026</em></p>
 
   <h2>Summary</h2>
   <p>
     AquaTrace keeps footprint tracking local. An optional shopping-product
     search is separate and sends only a small allowlisted product snapshot,
-    cleaned shopping search keywords, or a generic request
-    after you enable automatic matches once. With the checkbox off, no AON
-    requests are made, including from the popup.
+    cleaned shopping search keywords, or a generic request from the AquaTrace
+    shopping experience after you enable suggestions once. With the checkbox
+    off, no AON requests are made.
+  </p>
+
+  <p>
+    This page is the public privacy policy for the AquaTrace Chrome extension.
+    It explains the data the extension accesses, what stays on your device,
+    what is sent to AON, and how sponsored offer links work.
   </p>
 
   <h2>What the extension does</h2>
@@ -46,6 +55,7 @@
     extension storage
     (<code>chrome.storage.local</code>). This data:
   </p>
+
   <ul>
     <li>Never leaves your device for footprint tracking</li>
     <li>Is not sent to the developer or used for analytics</li>
@@ -62,23 +72,42 @@
     included in AON requests.
   </p>
 
+  <h2>How data is used and shared</h2>
+  <p>
+    AquaTrace uses data only to provide its two disclosed user-facing features:
+    local AI-footprint estimates and optional sponsored shopping suggestions.
+    It does not sell user data, use it for personalized or retargeted
+    advertising, or use it to build an unrelated browsing profile. AquaTrace
+    does not allow people to read individual user data except where necessary
+    for security, legal compliance, or support that the user specifically
+    requests.
+  </p>
+  <p>
+    The shopping fields listed below are shared with AON only when the user has
+    enabled sponsored suggestions. This transfer is necessary to match and
+    return the sponsored offers displayed by the extension. AON may share a
+    query with authorized offer partners to provide those results; those
+    partners' own privacy policies apply. No other third party receives the
+    extension's local AI history or conversation text.
+  </p>
+
   <h2>Permissions this extension uses, and why</h2>
   <ul>
     <li><strong>storage</strong> -- to save your running token counts locally, so they persist between browser sessions.</li>
     <li><strong>activeTab</strong> -- to detect which supported AI site your current tab is on, only at the moment you open the extension's popup.</li>
     <li><strong>Host access to chatgpt.com, chat.openai.com, claude.ai, gemini.google.com, and chat.deepseek.com</strong> -- to read prompt/response text on those specific pages in order to count tokens. No other pages are read for tracking.</li>
-    <li><strong>Host access to Amazon and Flipkart pages</strong> -- to read product title, category, displayed price, and currency locally, or cleaned search keywords when product context is unavailable, for the opt-in in-page offer bar and popup preview.</li>
-    <li><strong>Host access to api.aon.pro</strong> -- to request optional sponsored product matches automatically after you enable the checkbox.</li>
+    <li><strong>Host access to Amazon and Flipkart pages</strong> -- to read product title, category, displayed price, and currency locally, or cleaned search keywords when product context is unavailable, for the opt-in sponsored suggestions and product preview.</li>
+    <li><strong>Host access to api.aon.pro</strong> -- to request optional sponsored product matches after you enable the checkbox.</li>
   </ul>
 
   <h2>Third parties</h2>
   <p>
-    AquaTrace does not use analytics. After you enable automatic matches once,
+    AquaTrace does not use analytics. After you enable sponsored suggestions once,
     only the displayed product title, category, price, and currency are sent to
     AON (Agent Offer Network) to return sponsored matches. Without a product
     snapshot, only cleaned Amazon <code>k</code> or Flipkart <code>q</code>
     search keywords, or the text <em>Show me relevant offers</em>, are sent instead.
-    Popup refreshes require the same checkbox and use the same allowlist.
+    Automatic refreshes and popup requests require the same checkbox and use the same allowlist.
     The product URL, seller, page text,
     cookies, account data, AI chat text, token counts, local history, and tab
     metadata are not included.
@@ -90,14 +119,50 @@
     referrers. Clicking an offer opens its direct tracking link; the destination's
     own privacy policy and normal browser navigation behavior then apply.
   </p>
+
+  <h2>Security and retention</h2>
   <p>
-    Automatic offers are off by default and can be turned off using the popup
-    checkbox. The first upgrade to this automatic-offer feature resets the
-    earlier popup-only opt-in and opens a one-time onboarding page to ask for
-    this broader automatic feature.
+    AquaTrace sends optional shopping requests over HTTPS with credentials and
+    referrers omitted. The extension does not send authentication cookies or
+    embed a user API key. Local data is retained in Chrome extension storage
+    until you reset it, clear extension data, or uninstall AquaTrace. Temporary
+    offer results and query-cache entries are held in Chrome session storage and
+    are removed when the browser session ends.
+  </p>
+  <p>
+    AON's retention and processing are governed by the
+    <a href="https://aon.pro/privacy" target="_blank" rel="noopener">AON Privacy Policy</a>.
+    Please consult that policy for the current retention period, operational
+    logging, analytics, click-attribution, and partner-processing details.
+  </p>
+
+  <h2>Chrome Web Store Limited Use</h2>
+  <p>
+    AquaTrace's use of information received from Chrome APIs complies with the
+    Chrome Web Store User Data Policy, including the Limited Use requirements.
+    Chrome API data is used only for the user-facing features described on this
+    page and in the Chrome Web Store listing. Transfers are limited to what is
+    necessary to provide those features, protect security, or comply with law.
+  </p>
+  <p>
+    AON's handling is described in its
+    <a href="https://aon.pro/privacy" target="_blank" rel="noopener">AON Privacy Policy</a>.
+    AON states that it may record the submitted product-related query and
+    request metadata for matching, routing, abuse prevention, and service
+    operation. Its current policy states that the primary request-journal copy
+    is scheduled for deletion after a default seven-day window, while an
+    analytics-warehouse copy is not covered by that purge; operational logs are
+    typically retained for no longer than 30 days, and click-attribution records
+    are retained for settlement. AON may forward a query to authorized offer
+    partners, whose own privacy policies apply after you follow an offer.
+  </p>
+  <p>
+    Sponsored suggestions are off by default and can be turned off using the
+    popup checkbox. The first upgrade to this feature resets the earlier opt-in
+    and opens a one-time onboarding page to ask for consent.
     Opt-out aborts pending requests but cannot retract data already sent.
-    Dismissal and the last non-empty offers are kept per tab in
-    extension session storage and are removed when the tab or browser session ends.
+    The last non-empty offers are kept in extension session storage and are
+    removed when the browser session ends.
   </p>
 
   <h2>Changes to this policy</h2>

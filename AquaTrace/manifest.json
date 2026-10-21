@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "AquaTrace",
-  "version": "2.0.0",
-  "description": "Local AI footprint tracking plus optional automatic sponsored offers on Amazon and Flipkart after one-time opt-in.",
+  "version": "2.0.1",
+  "description": "Local AI footprint tracking plus optional sponsored shopping suggestions after one-time opt-in.",
   "permissions": [
     "storage",
     "activeTab"

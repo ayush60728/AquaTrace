@@ -571,7 +571,7 @@
       priceElement.textContent = formatProductPreviewPrice(productContext);
       preview.hidden = false;
       if (autoMatchesEnabled) {
-        status.textContent = "Product detected. Loading relevant suggestions automatically...";
+        status.textContent = "Product detected. Loading relevant suggestions...";
         requestOffers();
       } else {
         updateIdleState();
@@ -602,7 +602,7 @@
         autoMatchesEnabled = previousValue;
         autoToggle.checked = previousValue;
         updateIdleState();
-        status.textContent = "Could not save the automatic matches preference.";
+        status.textContent = "Could not save the sponsored suggestions preference.";
         return;
       }
 

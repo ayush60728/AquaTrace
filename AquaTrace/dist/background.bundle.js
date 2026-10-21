@@ -691,14 +691,14 @@
   });
 
   chrome.runtime.onInstalled.addListener(async details => {
-    // This migration marker records the automatic shopping/search consent
-    // introduced before 2.0. Ask once on install/upgrade, never precheck.
+    // This migration marker records the popup shopping/search consent
+    // introduced in 2.0. Ask once on install/upgrade, never precheck.
     if (details && ["install", "update"].includes(details.reason)) {
       try {
         const key = "aonShoppingOnboardingVersion";
         const stored = await chrome.storage.local.get(key);
-        if (stored[key] !== "1.3.0") {
-          await chrome.storage.local.set({ [AON_AUTO_MATCHES_KEY]: false, [key]: "1.3.0" });
+        if (stored[key] !== "2.0.0") {
+          await chrome.storage.local.set({ [AON_AUTO_MATCHES_KEY]: false, [key]: "2.0.0" });
           await chrome.tabs.create({ url: chrome.runtime.getURL("onboarding.html") });
         }
       } catch { /* Never let onboarding failures interrupt local AI tracking. */ }

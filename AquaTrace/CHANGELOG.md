@@ -2,6 +2,14 @@
 
 All notable changes to AquaTrace will be documented in this file.
 
+## [2.0.1] - 2026-10-21
+### Changed
+- Updated the public privacy-policy page and linked the extension popup to its
+  GitHub Pages URL.
+- Clarified local processing, AON data transfer, third-party sharing, retention,
+  security, sponsored links, and Chrome Web Store Limited Use disclosures.
+- Bumped the extension version for the Chrome Web Store submission.
+
 ## [2.0.0] - 2026-10-20
 ### Added
 - Reorganized the popup into **Shopping** and **AI Footprints** tabs, with
@@ -9,20 +17,18 @@ All notable changes to AquaTrace will be documented in this file.
   history, export, reset, Copy Summary and methodology actions live in the AI
   Footprints tab. The selected tab is transient; every new popup opens on
   Shopping.
-- One-time opt-in automatic AON sponsored offers on Amazon.in, Amazon.com, and
-  Flipkart, without requiring popup clicks for each page.
+- One-time opt-in automatic AON sponsored suggestions on Amazon.in, Amazon.com,
+  and Flipkart, without requiring popup clicks for each page.
 - A slim collapsible Shadow DOM offer bar with up to three clearly labeled
   sponsored offer cards containing HTTPS action links, source labels, prices,
   titles, and optional product images.
-- SPA navigation and DOM-change detection with product-context priority, cleaned
-  Amazon `k`/Flipkart `q` fallback queries, and bounded
-  title/category retries.
+- Product-context priority, cleaned Amazon `k`/Flipkart `q` fallback queries,
+  and bounded title/category retries.
 - First-install/upgrade onboarding page with one unchecked opt-in checkbox and
   the plain-language disclosure. The old popup-only preference is reset once
   for consent to automatic shopping/search requests; later reloads keep the choice.
-- Shopping suggestions now remain visible in the popup outside Amazon/Flipkart:
-  active shopping pages load live product/search/starter offers, while other
-  pages reuse the latest non-empty sponsored offers from extension session storage.
+- The popup can also show the current or latest sponsored suggestions when opened;
+  the in-page offer bar does not depend on opening it.
 - Ten-minute session query caching, concurrent-request deduplication, and a
   persistent cap of 50 query attempts per UTC day per browser profile.
 - Dependency-free release validation/packaging with `python3 build.py` and
@@ -35,8 +41,8 @@ All notable changes to AquaTrace will be documented in this file.
   generic request when product context is missing. URLs, seller/account data, page text, cookies,
   AI conversation data, and local history are excluded.
 - Unchecking the popup setting removes the bar immediately, aborts in-flight
-  requests, and blocks queued fallbacks and manual popup refreshes. Errors
-  and empty responses hide the bar without clearing the last non-empty offers
+  requests, and blocks queued fallbacks and manual popup refreshes. Errors and
+  empty responses hide the bar without clearing the last non-empty offers
   retained for the current session.
 - Live AON queries omit credentials/referrers and never send an Authorization
   header. HTTP 200 errors are rejected, and only trace IDs are logged.

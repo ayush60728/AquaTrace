@@ -362,13 +362,14 @@ test("tracking handlers remain usable while an offer request is pending", async 
   assert.equal((await offerRequest).ok, true);
 });
 
-test("install/upgrade opens onboarding once, unchecked, without resetting AI tracking", async () => {
+test("fresh install/upgrade migration stores 2.0, opens onboarding once unchecked, and preserves local AI tracking", async () => {
   for (const reason of ["install", "update"]) {
     const local = { aonAutoMatchesEnabled: true, waterTrackerState: {
       bySite: { "chatgpt.com": { modelId: "gpt-4o", prompts: 3 } }, history: []
     } };
     const worker = background({ local });
     await worker.events.installed({ reason });
+    assert.equal(local.aonShoppingOnboardingVersion, "2.0.0");
     assert.equal(local.aonAutoMatchesEnabled, false);
     assert.equal(worker.openedTabs[0].url, "chrome-extension://test/onboarding.html");
     assert.equal(worker.calls.length, 0);
@@ -378,6 +379,20 @@ test("install/upgrade opens onboarding once, unchecked, without resetting AI tra
     assert.equal(worker.openedTabs.length, 1);
     assert.equal(local.aonAutoMatchesEnabled, true, "later reloads preserve the new explicit choice");
   }
+});
+
+test("already-migrated 2.0 users do not see onboarding again or lose their preference", async () => {
+  const local = {
+    aonShoppingOnboardingVersion: "2.0.0",
+    aonAutoMatchesEnabled: true,
+    waterTrackerState: { bySite: { "chatgpt.com": { modelId: "gpt-4o", prompts: 3 } }, history: [] }
+  };
+  const worker = background({ local });
+  await worker.events.installed({ reason: "update" });
+  assert.equal(worker.openedTabs.length, 0);
+  assert.equal(local.aonShoppingOnboardingVersion, "2.0.0");
+  assert.equal(local.aonAutoMatchesEnabled, true);
+  assert.equal(local.waterTrackerState.bySite["chatgpt.com"].prompts, 3);
 });
 
 test("opt-out aborts the in-flight request and suppresses its entire fallback ladder", async () => {
